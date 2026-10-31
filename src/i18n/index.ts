@@ -14,6 +14,26 @@ interface I18nMessages {
   assetInfo: string;
   sha256Label: string;
   changelogSummary: string;
+  installButton: string;
+  installedBadge: string;
+  installing: string;
+  downloading: string;
+  verifying: string;
+  extracting: string;
+  finalizing: string;
+  deleteButton: string;
+  confirmDelete: string;
+  deleteTitle: string;
+  progressDownloading: string;
+  progressVerifying: string;
+  progressExtracting: string;
+  progressFinalizing: string;
+  errorHashMissing: string;
+  errorHashMismatch: string;
+  errorDownloadFailed: string;
+  errorExtractFailed: string;
+  errorAlreadyInstalled: string;
+  errorNotInstalled: string;
   errors: {
     network: string;
     io: string;

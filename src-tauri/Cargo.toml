@@ -22,10 +22,15 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip", "stream"] }
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "time"] }
 time = { version = "0.3", features = ["serde", "formatting", "local-offset"] }
+futures-util = "0.3"
+sha2 = "0.10"
+zip = "0.6"
+flate2 = "1.0"
+tar = "0.4"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

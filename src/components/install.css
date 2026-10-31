@@ -1,0 +1,168 @@
+.version-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #eee;
+  flex-wrap: wrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  .version-actions {
+    border-color: #333;
+  }
+}
+
+.version-actions.installed {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.installed-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2e7d32;
+  background: #e8f5e9;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .installed-badge {
+    color: #81c784;
+    background: #1b5e20;
+  }
+}
+
+.install-btn,
+.delete-btn {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.install-btn {
+  background-color: #646cff;
+  color: white;
+}
+
+.install-btn:hover:not(:disabled) {
+  background-color: #535bf2;
+}
+
+.install-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.delete-btn {
+  background-color: transparent;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background-color: #fde0e0;
+  border-color: #ef5350;
+}
+
+.delete-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.install-btn:disabled,
+.delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .delete-btn {
+    color: #ef5350;
+    border-color: #5a2a2a;
+  }
+
+  .delete-btn:hover:not(:disabled) {
+    background-color: #3a1a1a;
+    border-color: #ef5350;
+  }
+}
+
+.confirm-hint {
+  font-size: 0.7rem;
+  color: #c62828;
+  margin-left: 0.25rem;
+  white-space: nowrap;
+}
+
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 200px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 100px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .progress-bar {
+    background-color: #333;
+  }
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #646cff, #535bf2);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+  width: 0%;
+}
+
+.progress-label {
+  font-size: 0.75rem;
+  color: #666;
+  white-space: nowrap;
+  min-width: 140px;
+  text-align: right;
+}
+
+@media (prefers-color-scheme: dark) {
+  .progress-label {
+    color: #aaa;
+  }
+}
+
+.install-error {
+  width: 100%;
+  font-size: 0.75rem;
+  color: #c62828;
+  background-color: #fde0e0;
+  border: 1px solid #ef9a9a;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .install-error {
+    color: #ef5350;
+    background-color: #3a1a1a;
+    border-color: #5a2a2a;
+  }
+}

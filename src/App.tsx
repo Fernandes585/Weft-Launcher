@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "./i18n/useI18n";
+import { useInstall, InstalledVersion } from "./hooks/useInstall";
+import { VersionActions } from "./components/VersionActions";
 import "./App.css";
+import "./components/install.css";
 
 interface AssetInfo {
   name: string;
@@ -33,10 +36,18 @@ function formatDate(dateString: string): string {
 
 function App() {
   const { t, formatSize, ready } = useI18n();
+  const { installedVersions, refreshInstalled } = useInstall();
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fromCache, setFromCache] = useState(false);
+
+  const getInstalledVersion = useCallback(
+    (tag: string): InstalledVersion | null => {
+      return installedVersions.find((v) => v.tag === tag) ?? null;
+    },
+    [installedVersions]
+  );
 
   async function fetchReleases(forceRefresh = false) {
     setLoading(true);
@@ -108,6 +119,11 @@ function App() {
                   <pre>{release.body}</pre>
                 </details>
               )}
+              <VersionActions
+                release={release}
+                installedVersion={getInstalledVersion(release.tag)}
+                onInstallComplete={refreshInstalled}
+              />
             </li>
           ))}
         </ul>
