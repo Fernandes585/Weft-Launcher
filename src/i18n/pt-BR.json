@@ -1,0 +1,33 @@
+{
+  "appTitle": "Weft Launcher",
+  "refreshButton": "Atualizar lista",
+  "loading": "Carregando...",
+  "cacheBanner": "⚠ Mostrando cache (offline ou sem atualizações)",
+  "errorPrefix": "Erro: ",
+  "emptyState": "Nenhuma versão encontrada.",
+  "versionTag": "Versão",
+  "versionName": "Nome",
+  "prereleaseBadge": "Pré-lançamento",
+  "publishedDate": "Publicado em",
+  "assetInfo": "Asset: {name} ({size})",
+  "sha256Label": "SHA256: {hash}",
+  "changelogSummary": "Ver notas da versão",
+  "errors": {
+    "network": "Erro de rede: {0}",
+    "io": "Erro de I/O: {0}",
+    "serialization": "Erro de serialização: {0}",
+    "httpHeader": "Erro de cabeçalho HTTP: {0}",
+    "cacheCorrupted": "Cache corrompido: {0}",
+    "assetNotFound": "Asset não encontrado para a plataforma atual",
+    "missingDigest": "Digest SHA256 ausente no asset",
+    "rateLimited": "Limite de taxa da API GitHub excedido. Tente novamente mais tarde.",
+    "forbidden": "Acesso negado à API GitHub (403). Usando cache se disponível.",
+    "offlineNoCache": "Sem conexão e sem cache disponível"
+  },
+  "sizeUnits": {
+    "B": "B",
+    "KB": "KB",
+    "MB": "MB",
+    "GB": "GB"
+  }
+}
