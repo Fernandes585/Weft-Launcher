@@ -103,13 +103,17 @@ async fn ensure_cache_dir(app_handle: &tauri::AppHandle) -> Result<(), ReleasesE
 }
 
 fn current_platform_asset_suffix() -> &'static str {
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     return "windows-x64.zip";
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     return "linux-x64.tar.gz";
-    #[cfg(target_os = "macos")]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     return "macos-arm64.tar.gz";
-    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    #[cfg(not(any(
+        all(target_os = "windows", target_arch = "x86_64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(target_os = "macos", target_arch = "aarch64")
+    )))]
     return "";
 }
 fn select_asset_for_platform(assets: &[GitHubAsset]) -> Result<AssetInfo, ReleasesError> {

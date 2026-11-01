@@ -86,7 +86,6 @@ impl From<crate::launch::LaunchError> for AppError {
             ProcessSpawnFailed(msg) => AppError::new("ProcessSpawnFailed", Some(msg)),
             LogDirCreateFailed(msg) => AppError::new("LogDirCreateFailed", Some(msg)),
             GameFolderNotFound(msg) => AppError::new("GameFolderNotFound", Some(msg)),
-            UnsupportedPlatform(msg) => AppError::new("UnsupportedPlatform", Some(msg)),
             OpenerError(e) => AppError::new("OpenerError", Some(e.to_string())),
         }
     }

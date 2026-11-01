@@ -10,6 +10,9 @@ use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use zip::result::ZipError;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 // Import from launch module to check running versions
 use crate::launch::is_version_running;
 use crate::error::AppError;
@@ -322,6 +325,22 @@ pub async fn install_version(
             ))
             .into(),
         );
+    }
+
+    // On Unix, set executable permission on the binary before finalizing
+    #[cfg(unix)]
+    {
+        use std::fs::Permissions;
+        let mut perms = fs::metadata(&temp_executable).await?.permissions();
+        perms.set_mode(0o755);
+        if let Err(e) = fs::set_permissions(&temp_executable, perms).await {
+            cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
+            return Err(InstallError::ExtractFailed(format!(
+                "Falha ao definir permissão de execução: {}",
+                e
+            ))
+            .into());
+        }
     }
 
     // Finalizing

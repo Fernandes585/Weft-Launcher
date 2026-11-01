@@ -27,10 +27,78 @@ pub enum LaunchError {
     LogDirCreateFailed(String),
     #[error("Pasta do jogo não encontrada: {0}")]
     GameFolderNotFound(String),
-    #[error("Plataforma não suportada: {0}")]
-    UnsupportedPlatform(String),
     #[error("Erro ao abrir pasta: {0}")]
     OpenerError(#[from] OpenerError),
+}
+
+/// Remove ANSI escape codes from a string.
+fn strip_ansi_codes(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Potential ANSI escape sequence: ESC [
+            if chars.peek() == Some(&'[') {
+                chars.next(); // consume '['
+                // Skip until we find a letter (typically 'm' for SGR)
+                for c in chars.by_ref() {
+                    if c.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+                continue;
+            }
+            // Not an ANSI sequence, keep the ESC char
+            result.push(c);
+        } else if c == '[' {
+            // Handle case where ESC was already stripped: [...m
+            // Peek ahead to see if this looks like an SGR sequence
+            let mut peeked = chars.clone();
+            let mut looks_like_sgr = false;
+            let mut has_digit = false;
+            for pc in peeked.by_ref() {
+                if pc.is_ascii_digit() {
+                    has_digit = true;
+                } else if pc == ';' {
+                    if !has_digit {
+                        break;
+                    }
+                    has_digit = false;
+                } else if pc == 'm' && has_digit {
+                    looks_like_sgr = true;
+                    break;
+                } else {
+                    break;
+                }
+            }
+            if looks_like_sgr {
+                // Consume the sequence
+                for pc in chars.by_ref() {
+                    if pc == 'm' {
+                        break;
+                    }
+                }
+                continue;
+            }
+            // Not an SGR sequence, keep the bracket
+            result.push(c);
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Extract game folder path from a log line containing "game folder <path>, cache <path>".
+fn extract_game_folder_path(line: &str) -> Option<String> {
+    let cleaned = strip_ansi_codes(line);
+    let prefix = "game folder ";
+    let suffix = ", cache ";
+    let start = cleaned.find(prefix)?;
+    let start = start + prefix.len();
+    let end = cleaned[start..].find(suffix)?;
+    Some(cleaned[start..start + end].trim().to_string())
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -256,21 +324,51 @@ pub async fn get_running_versions(app_handle: AppHandle) -> Result<Vec<String>, 
 }
 
 #[tauri::command]
-pub async fn open_game_folder(app_handle: AppHandle, tag: String) -> Result<(), AppError> {
-    #[cfg(target_os = "windows")]
-    {
-        let versions_dir = get_versions_dir(&app_handle)?;
-        let version_dir = versions_dir.join(&tag);
-        if !version_dir.exists() {
-            return Err(LaunchError::GameFolderNotFound(version_dir.display().to_string()).into());
+pub async fn open_game_folder(app_handle: AppHandle, _tag: String) -> Result<(), AppError> {
+    let logs_dir = get_logs_dir(&app_handle)?;
+
+    // Read all log files, sort by modification time (newest first)
+    let mut entries = fs::read_dir(&logs_dir).await?;
+    let mut log_files: Vec<_> = Vec::new();
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) == Some("log")
+            && let Ok(metadata) = entry.metadata().await
+            && let Ok(modified) = metadata.modified()
+        {
+            log_files.push((path, modified));
         }
-        app_handle.opener().open_path(version_dir.to_string_lossy().as_ref(), None::<&str>).map_err(LaunchError::OpenerError)?;
-        Ok(())
     }
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err(LaunchError::UnsupportedPlatform("Game folder location not confirmed on this platform".to_string()).into())
+
+    // Sort by modification time, newest first
+    log_files.sort_by_key(|a| std::cmp::Reverse(a.1));
+
+    // Search each log file for the "game folder" line
+    for (log_path, _) in log_files {
+        let file = fs::File::open(&log_path).await?;
+        let reader = BufReader::new(file);
+        let mut lines = reader.lines();
+
+        while let Ok(Some(line)) = lines.next_line().await {
+            if let Some(game_folder) = extract_game_folder_path(&line) {
+                let game_folder_path = PathBuf::from(&game_folder);
+                if game_folder_path.exists() {
+                    app_handle
+                        .opener()
+                        .open_path(game_folder_path.to_string_lossy().as_ref(), None::<&str>)
+                        .map_err(LaunchError::OpenerError)?;
+                    return Ok(());
+                }
+                // Path from log doesn't exist, continue searching
+            }
+        }
     }
+
+    // No valid game folder found in any log
+    Err(LaunchError::GameFolderNotFound(
+        "Game folder not found in logs (game may not have been launched yet)".to_string(),
+    )
+    .into())
 }
 
 #[tauri::command]
