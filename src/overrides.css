@@ -149,7 +149,7 @@ html, body, #root {
   }
 }
 
-/* NEW badge on version cards */
+
 .version-entry .version-main {
   display: flex;
   align-items: center;
@@ -168,7 +168,6 @@ html, body, #root {
   line-height: 1;
 }
 
-/* Green dot on Versions tab when new versions exist */
 .tab-btn {
   position: relative;
 }
@@ -296,4 +295,14 @@ textarea {
     font-size: 0.65rem;
     padding: 0.35rem 0.5rem;
   }
+}
+.btn-secondary:hover:not(:disabled) {
+  filter: none;
+}
+.btn-open-folder {
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  font-weight: 100;
+  letter-spacing: 0.04em;
 }

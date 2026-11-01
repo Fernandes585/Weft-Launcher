@@ -197,12 +197,11 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
                 <span className="detail-value path">{selectedVersion.executable}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">{t("gameFolderTitle")}</span>
-                <span className="detail-value path">{t("gameFolderPath")}</span>
-                <button className="btn-flat btn-secondary" onClick={handleOpenFolder}>
-                  {t("openFolderButton")}
-                </button>
-              </div>
+  <span className="detail-label">{t("gameFolderTitle")}</span>
+  <button className="btn-flat btn-secondary btn-open-folder" onClick={handleOpenFolder}>
+  {t("openFolderButton")}
+</button>
+</div>
             </>
           ) : (
             <p className="select-version-hint">{t("selectVersionHint")}</p>
