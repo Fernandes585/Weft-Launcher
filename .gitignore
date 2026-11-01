@@ -5,11 +5,19 @@ dist-ssr
 *.local
 npm-debug.log*
 yarn-debug.log*
+Thumbs.db
 yarn-error.log*
 pnpm-debug.log*
+*.key
+desktop.ini
+*.key.pub
+*.pem
+.env
+.env.*
 
 # Rust & Tauri
 /target
+/src-tauri/gen/schemas
 /src-tauri/target
 
 # IDEs
@@ -26,4 +34,4 @@ pnpm-debug.log*
 # Logs
 logs
 *.log
-
+*.bak
