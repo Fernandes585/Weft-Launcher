@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2.json",
-  "productName": "weft-launcher",
+  "productName": "Weft Launcher",
   "version": "1.0.0",
   "identifier": "dev.weft.launcher",
   "build": {
