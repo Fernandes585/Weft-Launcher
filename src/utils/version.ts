@@ -37,3 +37,17 @@ export function isNewRelease(
   if (!highestInstalled) return false; // no versions installed yet
   return compareTags(releaseTag, highestInstalled) > 0;
 }
+
+/**
+ * Returns the latest release tag (highest published_at) from the releases list,
+ * ignoring prereleases. Returns null if releases is empty or not loaded.
+ */
+export function getLatestTag(releases: { tag: string; published_at: string; prerelease: boolean }[]): string | null {
+  if (!releases || releases.length === 0) return null;
+  const nonPrereleases = releases.filter((r) => !r.prerelease);
+  if (nonPrereleases.length === 0) return null;
+  const sorted = [...nonPrereleases].sort(
+    (a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
+  );
+  return sorted[0].tag;
+}

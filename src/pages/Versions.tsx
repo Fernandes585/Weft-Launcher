@@ -3,7 +3,6 @@ import { useInstall } from "../hooks/useInstall";
 import { VersionActions } from "../components/VersionActions";
 import { translateError } from "../i18n/errors";
 import { getLocale } from "../i18n";
-import { isNewRelease } from "../utils/version";
 
 interface Release {
   tag: string;
@@ -27,6 +26,7 @@ interface VersionsPageProps {
   fromCache: boolean;
   onRefresh: (forceRefresh?: boolean) => void;
   onNewVersionsChange?: (hasNew: boolean) => void;
+  latestTag: string | null;
 }
 
 export function VersionsPage({
@@ -36,20 +36,23 @@ export function VersionsPage({
   fromCache,
   onRefresh,
   onNewVersionsChange,
+  latestTag,
 }: VersionsPageProps) {
   const { t, formatSize: fmtSize } = useI18n();
   const { installedVersions, refreshInstalled } = useInstall();
 
   const installedMap = new Map(installedVersions.map((v) => [v.tag, v]));
 
-  // Compute if there are any new versions
-  const hasNewVersions = releases.some((r) =>
-    isNewRelease(r.tag, installedVersions, installedMap)
-  );
+  // NEW badge logic: show ONLY on the release whose tag === latestTag,
+  // AND only if latestTag is NOT installed AND there's at least one other installed version
+  const hasInstalledVersions = installedVersions.length > 0;
+  const isLatestInstalled = latestTag ? installedMap.has(latestTag) : false;
+  const showNewBadgeOnTag = latestTag && !isLatestInstalled && hasInstalledVersions ? latestTag : null;
+
+  // Compute if there are any new versions (for the tab indicator)
+  const hasNewVersions = releases.some((r) => r.tag === showNewBadgeOnTag);
 
   // Notify parent about new versions state change
-  // We use a simple approach: call onNewVersionsChange on every render
-  // The parent can use useEffect to track changes if needed
   if (onNewVersionsChange) {
     onNewVersionsChange(hasNewVersions);
   }
@@ -84,7 +87,7 @@ export function VersionsPage({
           {sortedReleases.map((release) => {
             const installedVersion = installedMap.get(release.tag) ?? null;
             const asset = release.asset;
-            const isNew = isNewRelease(release.tag, installedVersions, installedMap);
+            const isNew = release.tag === showNewBadgeOnTag;
 
             return (
               <article

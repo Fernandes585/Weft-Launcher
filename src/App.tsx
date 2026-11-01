@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "./i18n/useI18n";
 import { Sidebar } from "./components/Sidebar";
@@ -6,6 +6,7 @@ import { Tabs } from "./components/Tabs";
 import { Home } from "./pages/Home";
 import { VersionsPage } from "./pages/Versions";
 import { NotesPage } from "./pages/Notes";
+import { getLatestTag } from "./utils/version";
 import "./App.css";
 
 interface AssetInfo {
@@ -36,6 +37,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [hasNewVersions, setHasNewVersions] = useState(false);
 
+  const latestTag = useMemo(() => getLatestTag(releases), [releases]);
+
   async function fetchReleases(forceRefresh = false) {
     setLoading(true);
     setError(null);
@@ -62,7 +65,7 @@ function App() {
   const renderPage = () => {
     switch (activeTab) {
       case "home":
-        return <Home onGoToVersions={() => setActiveTab("versions")} />;
+        return <Home onGoToVersions={() => setActiveTab("versions")} latestTag={latestTag} />;
       case "versions":
         return (
           <VersionsPage
@@ -72,6 +75,7 @@ function App() {
             fromCache={fromCache}
             onRefresh={fetchReleases}
             onNewVersionsChange={setHasNewVersions}
+            latestTag={latestTag}
           />
         );
       case "notes":

@@ -8,7 +8,7 @@ import { useGameState } from "../hooks/useGameState";
 import { PixelBanner } from "../components/PixelBanner";
 import { compareTags } from "../utils/version";
 
-export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
+export function Home({ onGoToVersions, latestTag }: { onGoToVersions: () => void; latestTag: string | null }) {
   const { t, locale } = useI18n();
   const { installedVersions } = useInstall();
   const { anyRunning, isRunning, launch } = useGameState();
@@ -144,9 +144,9 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
               onChange={(e) => setSelectedTag(e.target.value || null)}
               disabled={anyRunning}
             >
-              {sortedVersions.map((v, i) => (
+              {sortedVersions.map((v) => (
               <option key={v.tag} value={v.tag}>
-              {i === 0 ? `${v.tag} — ${t("latestBadge")}` : v.tag}
+              {latestTag && v.tag === latestTag ? `${v.tag} — ${t("latestBadge")}` : v.tag}
               </option>
              ))}
             </select>
