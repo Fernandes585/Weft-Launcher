@@ -22,6 +22,7 @@ interface I18nMessages {
   extracting: string;
   finalizing: string;
   deleteButton: string;
+  deleteForReal: string;
   confirmDelete: string;
   deleteTitle: string;
   progressDownloading: string;

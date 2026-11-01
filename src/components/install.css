@@ -78,6 +78,22 @@
   transform: scale(0.98);
 }
 
+/* Confirming state - solid red for second click */
+.delete-btn.confirming {
+  background-color: #c62828;
+  color: white;
+  border-color: #c62828;
+}
+
+.delete-btn.confirming:hover:not(:disabled) {
+  background-color: #b71c1c;
+  border-color: #b71c1c;
+}
+
+.delete-btn.confirming:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
 .install-btn:disabled,
 .delete-btn:disabled {
   opacity: 0.5;

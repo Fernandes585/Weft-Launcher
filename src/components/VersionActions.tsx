@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useInstall, InstalledVersion, InstallProgress } from "../hooks/useInstall";
 import { t } from "../i18n";
 import "./install.css";
@@ -37,6 +37,16 @@ export function VersionActions({
 
   const isCurrentlyInstalling = loading && localProgress?.stage !== "done" && localProgress?.stage !== "error";
 
+  // Auto-revert confirm state after 4 seconds
+  useEffect(() => {
+    if (confirmDelete) {
+      const timer = setTimeout(() => {
+        setConfirmDelete(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [confirmDelete]);
+
   const handleInstall = async () => {
     if (!release.asset.sha256) {
       clearError();
@@ -68,12 +78,7 @@ export function VersionActions({
       return;
     }
 
-    const confirmed = window.confirm(t("confirmDelete", release.tag));
-    if (!confirmed) {
-      setConfirmDelete(false);
-      return;
-    }
-
+    // Second click - proceed with deletion
     clearError();
     setLocalProgress({ tag: release.tag, stage: "verifying" });
 
@@ -116,16 +121,13 @@ export function VersionActions({
       <div className="version-actions installed">
         <span className="installed-badge">{t("installedBadge")}</span>
         <button
-          className="delete-btn"
+          className={`delete-btn${confirmDelete ? " confirming" : ""}`}
           onClick={handleRemove}
           disabled={loading}
-          aria-label={t("deleteButton")}
+          aria-label={confirmDelete ? t("deleteForReal") : t("deleteButton")}
         >
-          {confirmDelete ? t("deleteButton") + "?" : t("deleteButton")}
+          {confirmDelete ? t("deleteForReal") : t("deleteButton")}
         </button>
-        {confirmDelete && (
-          <span className="confirm-hint">{t("confirmDelete", release.tag)}</span>
-        )}
       </div>
     );
   }
