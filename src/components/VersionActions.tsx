@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useInstall, InstalledVersion, InstallProgress } from "../hooks/useInstall";
 import { useGameState } from "../hooks/useGameState";
 import { t } from "../i18n";
-import "./install.css";
 
 interface VersionActionsProps {
   release: {

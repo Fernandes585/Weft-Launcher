@@ -45,7 +45,7 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
         <section className="hero empty">
           <h1>{t("appTitle")}</h1>
           <p className="empty-message">{t("noVersionsInstalled")}</p>
-          <button className="btn-primary" onClick={onGoToVersions}>
+          <button className="btn-flat btn-primary" onClick={onGoToVersions}>
             {t("goToVersionsTab")}
           </button>
         </section>
@@ -56,8 +56,15 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
   return (
     <main className="page home-page">
       <section className="hero">
-        <h1>{t("appTitle")}</h1>
-        <div className="play-area">
+        <div className="hero-header">
+          <div>
+            <h1 className="hero-title">Weft</h1>
+          </div>
+          <div className="hero-version-badge">
+            VERSÃO {selectedTag || installedVersions[0]?.tag || "—"} · PRONTO
+          </div>
+        </div>
+        <div className="hero-play-area">
           <div className="version-selector">
             <label htmlFor="version-select" className="visually-hidden">
               {t("selectVersionLabel")}
@@ -92,28 +99,46 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
         )}
       </section>
 
-      <section className="instance-card">
-        <h2>{t("instanceCardTitle")}</h2>
-        {selectedVersion ? (
-          <div className="instance-details">
-            <div className="detail-row">
-              <span className="detail-label">{t("versionLabel")}</span>
-              <span className="detail-value">{selectedVersion.tag}</span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">{t("installedAtLabel")}</span>
-              <span className="detail-value">
-                {new Date(selectedVersion.installed_at).toLocaleString("pt-BR")}
-              </span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">{t("executableLabel")}</span>
-              <span className="detail-value path">{selectedVersion.executable}</span>
-            </div>
-          </div>
-        ) : (
-          <p className="select-version-hint">{t("selectVersionHint")}</p>
-        )}
+      <section className="card">
+        <div className="card-header">
+          <h2 className="card-title">{t("instanceCardTitle")}</h2>
+        </div>
+        <div className="card-body">
+          {selectedVersion ? (
+            <>
+              <div className="detail-row">
+                <span className="detail-label">{t("versionLabel")}</span>
+                <span className="detail-value">{selectedVersion.tag}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">{t("installedAtLabel")}</span>
+                <span className="detail-value">
+                  {new Date(selectedVersion.installed_at).toLocaleString("pt-BR")}
+                </span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">{t("executableLabel")}</span>
+                <span className="detail-value path">{selectedVersion.executable}</span>
+              </div>
+            </>
+          ) : (
+            <p className="select-version-hint">{t("selectVersionHint")}</p>
+          )}
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card-header">
+          <h2 className="card-title">{t("gameFolderTitle")}</h2>
+        </div>
+        <div className="card-body">
+          <p className="detail-value path">{t("gameFolderPath")}</p>
+        </div>
+        <div className="card-actions">
+          <button className="btn-flat btn-secondary" disabled>
+            {t("openFolderButton")}
+          </button>
+        </div>
       </section>
     </main>
   );

@@ -64,6 +64,10 @@
   "inUseBadge": "Em uso",
   "noChangelog": "Sem notas de versão.",
   "dismiss": "Dispensar",
+  "instancesTitle": "INSTÂNCIAS",
+  "gameFolderTitle": "Pasta do jogo",
+  "gameFolderPath": "Caminho da pasta do jogo",
+  "openFolderButton": "Abrir pasta",
   "errors": {
     "network": "Erro de rede: {0}",
     "io": "Erro de I/O: {0}",

@@ -8,14 +8,18 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <h2>{t("appTitle")}</h2>
+        <h2>{t("instancesTitle")}</h2>
       </div>
       <div className="sidebar-instance">
-        <div className="instance-info">
-          <span className="instance-name">{t("instanceName")}</span>
-          <span className={`instance-status ${anyRunning ? "running" : "ready"}`}>
-            {anyRunning ? t("statusPlaying") : t("statusReady")}
-          </span>
+        <div className="instance-item">
+          <div className="instance-icon" />
+          <div className="instance-info">
+            <span className="instance-name">{t("instanceName")}</span>
+            <span className="instance-status">
+              <span className="status-dot" />
+              {anyRunning ? t("statusPlaying") : t("statusReady")}
+            </span>
+          </div>
         </div>
       </div>
       <div className="sidebar-footer">

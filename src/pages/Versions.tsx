@@ -69,8 +69,12 @@ export function VersionsPage({
             const asset = release.asset;
 
             return (
-              <article key={release.tag} className="version-entry" role="listitem">
-                <div className="version-info">
+              <article
+                key={release.tag}
+                className={`version-entry${installedVersion ? " in-use" : ""}`}
+                role="listitem"
+              >
+                <div className="version-header">
                   <div className="version-main">
                     <span className="version-tag">{release.tag}</span>
                     {release.prerelease && (

@@ -64,6 +64,10 @@
   "inUseBadge": "In use",
   "noChangelog": "No release notes.",
   "dismiss": "Dismiss",
+  "instancesTitle": "INSTANCES",
+  "gameFolderTitle": "Game folder",
+  "gameFolderPath": "Game folder path",
+  "openFolderButton": "Open folder",
   "errors": {
     "network": "Network error: {0}",
     "io": "I/O error: {0}",
