@@ -243,16 +243,57 @@ textarea {
   --play-shadow: #9a5d06;
 }
 
-/* Âmbar pede texto escuro; branco sobre âmbar fica ruim de ler */
 .btn-primary,
 .btn-play,
 .install-btn {
   color: #1a1204 !important;
 }
 
-/* Sombra do banner em marinho, em vez de roxo */
 .pb-shade {
   background:
     linear-gradient(270deg, rgba(10, 14, 23, 0.62) 0%, rgba(10, 14, 23, 0.22) 45%, transparent 75%),
     linear-gradient(0deg, rgba(10, 14, 23, 0.35), transparent 40%);
+}
+
+
+
+.tabs-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 10px;
+}
+.tabs .tabs-right .lang {
+  margin-left: 0;
+}
+
+.update-btn {
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 0.4rem 0.9rem;
+  background: var(--play);
+  color: #1a1204;
+  border: var(--border-width) solid var(--play-edge);
+  border-bottom-width: 5px;
+  border-bottom-color: var(--play-shadow);
+  cursor: pointer;
+}
+.update-btn:hover:not(:disabled) {
+  background: var(--play-hover);
+}
+.update-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  border-bottom-width: 3px;
+}
+
+@media (max-width: 720px) {
+  .update-btn {
+    font-size: 0.65rem;
+    padding: 0.35rem 0.5rem;
+  }
 }

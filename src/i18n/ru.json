@@ -1,6 +1,11 @@
 {
   "appTitle": "Weft Launcher",
   "latestBadge": "Последняя",
+  "updateAvailable": "ДОСТУПНО ОБНОВЛЕНИЕ",
+"updateDownloading": "ОБНОВЛЕНИЕ {0}%",
+"updateFailed": "ОШИБКА ОБНОВЛЕНИЯ · ПОВТОРИТЬ",
+"updateTooltip": "Обновить до версии {0} и перезапустить",
+"updateCloseGame": "Закройте игру перед обновлением",
   "refreshButton": "Обновить список",
   "loading": "Загрузка...",
   "cacheBanner": "⚠ Показан кэш (нет сети или нет обновлений)",

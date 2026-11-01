@@ -1,5 +1,6 @@
 import { useI18n } from "../i18n/useI18n";
 import { LanguageMenu } from "./LanguageMenu";
+import { UpdateButton } from "./UpdateButton";
 
 type TabId = "home" | "versions" | "notes";
 
@@ -34,7 +35,10 @@ export function Tabs({ activeTab, onChange, hasNewVersions }: TabsProps) {
           {tab.id === "versions" && hasNewVersions && <span className="new-dot" aria-label="New versions available" />}
         </button>
       ))}
-      <LanguageMenu />
+      <div className="tabs-right">
+        <UpdateButton />
+        <LanguageMenu />
+      </div>
     </nav>
   );
 }

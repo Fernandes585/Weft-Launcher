@@ -2,6 +2,11 @@ export type Locale = 'pt-BR' | 'en' | 'es' | 'ru';
 
 interface I18nMessages {
   heroBadge: string;
+  updateAvailable: string;
+updateDownloading: string;
+updateFailed: string;
+updateTooltip: string;
+updateCloseGame: string;
   latestBadge: string;
   appTitle: string;
   refreshButton: string;

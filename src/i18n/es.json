@@ -1,6 +1,11 @@
 {
   "appTitle": "Weft Launcher",
   "latestBadge": "Última",
+  "updateAvailable": "ACTUALIZACIÓN DISPONIBLE",
+"updateDownloading": "ACTUALIZANDO {0}%",
+"updateFailed": "ERROR AL ACTUALIZAR · REINTENTAR",
+"updateTooltip": "Actualizar a la versión {0} y reiniciar",
+"updateCloseGame": "Cierra el juego antes de actualizar",
   "refreshButton": "Actualizar lista",
   "loading": "Cargando...",
   "cacheBanner": "⚠ Mostrando caché (sin conexión o sin actualizaciones)",

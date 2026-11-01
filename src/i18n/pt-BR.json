@@ -1,5 +1,10 @@
 {
   "heroBadge": "VERSÃO {0} · PRONTO",
+  "updateAvailable": "ATUALIZAÇÃO DISPONÍVEL",
+"updateDownloading": "ATUALIZANDO {0}%",
+"updateFailed": "FALHA NA ATUALIZAÇÃO · TENTAR DE NOVO",
+"updateTooltip": "Atualizar para a versão {0} e reiniciar",
+"updateCloseGame": "Feche o jogo antes de atualizar",
   "latestBadge": "Mais recente",
   "appTitle": "Weft Launcher",
   "refreshButton": "Atualizar lista",
