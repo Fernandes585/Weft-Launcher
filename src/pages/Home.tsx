@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useI18n } from "../i18n/useI18n";
 import { useInstall } from "../hooks/useInstall";
 import { useGameState } from "../hooks/useGameState";
+   import { PixelBanner } from "../components/PixelBanner";
 
 export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
   const { t } = useI18n();
@@ -43,6 +44,7 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
     return (
       <main className="page home-page">
         <section className="hero empty">
+          <PixelBanner />                                        
           <h1>{t("appTitle")}</h1>
           <p className="empty-message">{t("noVersionsInstalled")}</p>
           <button className="btn-flat btn-primary" onClick={onGoToVersions}>
@@ -56,6 +58,7 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
   return (
     <main className="page home-page">
       <section className="hero">
+        <PixelBanner />              
         <div className="hero-header">
           <div>
             <h1 className="hero-title">Weft</h1>

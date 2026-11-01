@@ -1,25 +1,46 @@
+/* Weft Launcher: tokens e base (estilo inspirado no launcher do Horizon) */
 :root {
-  --bg: #100c22;
-  --panel: #1a1535;
-  --panel-lighter: #201a45;
-  --border: #3a2f6b;
+  /* superfícies */
+  --bg: #0b0a11;            /* barra de abas e barra lateral */
+  --content-bg: #0f0d17;    /* área central */
+  --panel: #1a1727;         /* cartões */
+  --panel-lighter: #221e34; /* item selecionado, aba ativa */
+  --border: #342d52;
+  --border-soft: #2a2442;
+
+  /* texto */
   --text: #efeaff;
-  --text-dim: #a89fcc;
-  --primary: #5b3fd9;
-  --primary-hover: #6d54e0;
-  --primary-active: #4a2fc0;
+  --text-dim: #9d97b3;
+
+  /* cores de ação */
+  --primary: #5b3fd6;
+  --primary-hover: #6a4fe8;
+  --primary-active: #4a31bb;
+  --accent: #9a86ff;        /* sublinhado da aba ativa, tags, links */
+
+  /* botão Jogar (troque por verde se preferir: #2e9e5b / #3aba6d / #4fd185 / #1f7340) */
+  --play: #5b3fd6;
+  --play-hover: #6a4fe8;
+  --play-edge: #7a62ef;     /* borda de cima e dos lados */
+  --play-shadow: #3a2694;   /* faixa escura embaixo */
+
   --success: #2e9e5b;
   --success-hover: #3aba6d;
   --success-active: #25804d;
   --danger: #c62828;
   --danger-hover: #d33b3b;
   --danger-active: #a82020;
+  --danger-text: #ff8080;
 
   --border-width: 3px;
   --radius: 0;
+  --gutter: clamp(12px, 3vw, 34px);
 
-  --font-heading: 'Silkscreen', cursive;
-  --font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* fontes: Pixelify Sans no corpo e nos títulos, Silkscreen nos rótulos pequenos */
+  --font-heading: 'Pixelify Sans', 'Silkscreen', ui-monospace, monospace;
+  --font-label: 'Silkscreen', 'Pixelify Sans', ui-monospace, monospace;
+  --font-body: 'Pixelify Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-text: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; /* textos longos */
 }
 
 @font-face {
@@ -34,12 +55,18 @@
   box-sizing: border-box;
 }
 
+/* a escala de tudo acompanha o tamanho da tela (telas grandes ficam um pouco maiores) */
+html {
+  font-size: clamp(14px, calc(0.3vw + 12.6px), 17px);
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
   min-height: 100vh;
+  -webkit-font-smoothing: auto;
 }
 
 #root {
@@ -62,7 +89,7 @@ button:disabled {
 }
 
 a {
-  color: var(--primary);
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -80,12 +107,22 @@ input, select {
 
 input:focus, select:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: var(--accent);
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--primary);
+  color: #fff;
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -98,20 +135,19 @@ input:focus, select:focus {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-dim);
+  background: #4b4276;
 }
 
-/* Flat button base */
+/* Botões planos (borda mais grossa embaixo, afundam ao clicar) */
 .btn-flat {
   font-family: var(--font-heading);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 400;
   padding: 0.6rem 1.2rem;
   border: var(--border-width) solid var(--border);
-  border-bottom-width: 4px;
+  border-bottom-width: 5px;
   transition: background 0.1s, border-color 0.1s, color 0.1s, transform 0.05s;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 
 .btn-flat:disabled {
@@ -120,60 +156,58 @@ input:focus, select:focus {
 }
 
 .btn-flat:hover:not(:disabled) {
-  filter: brightness(1.15);
+  filter: brightness(1.12);
 }
 
 .btn-flat:active:not(:disabled) {
   transform: translateY(2px);
+  border-bottom-width: 3px;
   filter: brightness(1);
 }
 
 .btn-primary {
   background: var(--primary);
   color: #fff;
-  border-color: var(--primary);
+  border-color: var(--play-edge);
+  border-bottom-color: var(--play-shadow);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-hover);
-  border-color: var(--primary-hover);
 }
 
 .btn-primary:active:not(:disabled) {
   background: var(--primary-active);
-  border-color: var(--primary-active);
 }
 
 .btn-success {
   background: var(--success);
   color: #fff;
-  border-color: var(--success);
+  border-color: var(--success-hover);
+  border-bottom-color: var(--success-active);
 }
 
 .btn-success:hover:not(:disabled) {
   background: var(--success-hover);
-  border-color: var(--success-hover);
 }
 
 .btn-success:active:not(:disabled) {
   background: var(--success-active);
-  border-color: var(--success-active);
 }
 
 .btn-danger {
   background: var(--danger);
   color: #fff;
-  border-color: var(--danger);
+  border-color: var(--danger-hover);
+  border-bottom-color: var(--danger-active);
 }
 
 .btn-danger:hover:not(:disabled) {
   background: var(--danger-hover);
-  border-color: var(--danger-hover);
 }
 
 .btn-danger:active:not(:disabled) {
   background: var(--danger-active);
-  border-color: var(--danger-active);
 }
 
 .btn-secondary {
@@ -184,7 +218,7 @@ input:focus, select:focus {
 
 .btn-secondary:hover:not(:disabled) {
   background: var(--panel-lighter);
-  border-color: var(--primary);
+  border-color: var(--accent);
 }
 
 .btn-secondary:active:not(:disabled) {
@@ -193,15 +227,22 @@ input:focus, select:focus {
 
 .btn-ghost {
   background: transparent;
-  color: var(--text);
+  color: var(--text-dim);
   border-color: transparent;
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: rgba(91, 63, 217, 0.15);
-  border-color: var(--primary);
+  color: var(--text);
+  background: rgba(154, 134, 255, 0.12);
+  border-color: var(--border);
 }
 
 .btn-ghost:active:not(:disabled) {
-  background: rgba(91, 63, 217, 0.25);
+  background: rgba(154, 134, 255, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }

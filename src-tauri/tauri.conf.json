@@ -11,12 +11,15 @@
   },
   "app": {
     "windows": [
-      {
-        "title": "weft-launcher",
-        "width": 800,
-        "height": 600
-      }
-    ],
+  {
+    "title": "Weft Launcher",
+    "width": 960,
+    "height": 565,
+    "minWidth": 960,
+    "minHeight": 565,
+    "center": true
+  }
+],
     "security": {
       "csp": null
     }

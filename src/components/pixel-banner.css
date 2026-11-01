@@ -1,0 +1,92 @@
+/* Weft pixel banner: cenário em pixel art animado (tarde), só CSS, sem JS.
+   Uso: o elemento pai do banner precisa de position: relative e overflow: hidden.
+   Tudo escala com --px (tamanho de 1 "pixel" do cenário) e se adapta à largura da tela. */
+
+.pb {
+  --px: clamp(4px, calc(0.4vw + 3px), 8px);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  image-rendering: pixelated;
+  /* céu de fim de tarde em faixas, como pixel art */
+  background: linear-gradient(to bottom,
+    #35479a 0 8%, #3f55a6 8% 17%, #5163b0 17% 26%, #6f72b6 26% 35%,
+    #9a7fb0 35% 44%, #c78ea8 44% 53%, #e8a09a 53% 62%, #f6b88a 62% 72%,
+    #fdd29a 72% 84%, #ffe7b3 84% 100%);
+}
+
+/* sol baixo, quadrado, com brilho em anéis */
+.pb-sun {
+  position: absolute;
+  right: 16%;
+  bottom: calc(13 * var(--px));
+  width: calc(6 * var(--px));
+  height: calc(6 * var(--px));
+  background: #fff6d6;
+  box-shadow:
+    0 0 0 var(--px) rgba(255, 233, 160, 0.75),
+    0 0 0 calc(2 * var(--px)) rgba(255, 214, 140, 0.45),
+    0 0 0 calc(4 * var(--px)) rgba(255, 190, 120, 0.22),
+    0 0 0 calc(7 * var(--px)) rgba(255, 170, 110, 0.10);
+}
+
+/* camadas que correm para a esquerda (parallax): quanto mais perto, mais rápido */
+.pb-layer {
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--bottom, 0) * var(--px));
+  width: calc(100% + var(--tw) * var(--px));
+  height: calc(var(--th) * var(--px));
+  background-repeat: repeat-x;
+  background-position: left bottom;
+  background-size: calc(var(--tw) * var(--px)) calc(var(--th) * var(--px));
+  image-rendering: pixelated;
+  will-change: transform;
+  animation: pb-scroll var(--dur) linear infinite;
+}
+
+.pb-clouds-far {
+  --tw: 192; --th: 26; --dur: 190s;
+  top: calc(1 * var(--px)); bottom: auto;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAAAaCAYAAADheVNOAAAAsklEQVR42u3aMQ6CQBAFUEy24g4mHsATGCprb+BdqZQT2Eth7EyotNTeqKhx48K+10L1Z4dJdigKAIDsTEQwbtd2Vz8s/Gy+lM4XDSDQYTg3m/qd98pFlXXdwqeBXo7dy+e5B5qK074Twi8bQKDDMl2vfIgAAADuZL8HeHat2xuca99RCLkHcNi2ToEJAGlO5NiTVgOQhL7NdawFqwYg6YMfuxGCEvBP/jAAAAAAAACACG53wzHl1/m7swAAAABJRU5ErkJggg==");
+}
+.pb-hills-far {
+  --tw: 128; --th: 22; --bottom: 6; --dur: 85s;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAAWCAYAAAAIAZSVAAAA/0lEQVR42u2YzQ3CMAxGU8QKHGAPxmEEBmAFrozADizBHu0hQ8CpKBSi/thOq/q9c6uo/l4SuyEAAAAAANxvzxdV8EPVDbypY9gfdl8Pnc7Hag7JtNeF3xyq6+XRG0YrhCSQNPSmjoPeSUVEBv0N2NQxDBJAEki6mARk0A3+cwWMEWBoIFN2OzKUDV4sQC4Qq9CRwebKVRFgKXiXYcrJu11TAdKPTothLUN3qikpn/S6XdUJYDnFjCm89Umk2WO5EEBLBMkoKxXBqrF2JcDUUDRGWckIbdlYuxQgN7204fz7O2q9bl9PY4VrAXLhlBxj52ZD5OV3HQIAAgACwAJ4A8O+sXBVuCwsAAAAAElFTkSuQmCC");
+}
+.pb-clouds-near {
+  --tw: 256; --th: 30; --dur: 120s;
+  top: calc(3 * var(--px)); bottom: auto;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAAeCAYAAADD2cA5AAAAx0lEQVR42u3arQ7CMBAA4EGQJHg0mgchPC5B8whkCoEkeBZ88WSkrdjY2u/TU7e76/WnaQAAgIoshIApCO9n6E3Q9VaOagAUW/j3NiQl6m4vVwewEgL+qbs9BGFOE8D3qGZEgwoaQGxUM6JBgQ0gdY+mEUCBZwD2aAAAUNUZAJDv18OmaEGOfKvmHQAMoLtcTQDkrxLeVaABlF74CVerrlMZw1IIplf8Od+BBgDYAszF63SOru6b48G/AQAAAAAAAAAAAACgzwdwBjNQ/uk1RAAAAABJRU5ErkJggg==");
+}
+.pb-hills-mid {
+  --tw: 96; --th: 16; --bottom: 6; --dur: 31s;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAQCAYAAADpunr5AAAArElEQVR42u2WQQ5AMBBFp4kjcC5biaUDOItY27ub3oENSVODNqrVyX9Li4m8Ny1EAAAAAEiC6rt5tR8OU6OgJlKAth5PAcqyQowdc0FDuLAXng3AxZAegrsJiIi0XtjF9IlizjbnOQXI7VRciXzCFuMKF8VntnOAP8e427AsvwFvNyBWlEN8btKDBkgRRYL4TwN8dW1JEh89wJsYEsUnDRDyLyJ3itQvIFmuCxunsmEr9dDNGAAAAABJRU5ErkJggg==");
+}
+.pb-trees {
+  --tw: 160; --th: 14; --bottom: 7; --dur: 26s;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAAAOCAYAAACo2RezAAAAuUlEQVR42u2UIRKAIBBFYcdTWUwWT2P0CEZPYzFZPImBaCFj0jFoUIRl9b/kWJb//oJSAAAAAAAAAADAX9CpH7AqO7d990OtJcv+UhaWBYwtcJtnrdn/jVOrJS9fjCySFj17KrDIGxd6GY5lSS8pZBbunnxc0h2BsSRevRBviTyWZK1RRd44qVm4e/J1SakJPJu7LPOr8zguU6gs3D35uqTUBEp+WVPKF6snX5ekfspXLpN0lwR9gJMV9NqpoZZmoYEAAAAASUVORK5CYII=");
+}
+.pb-ground {
+  --tw: 32; --th: 8; --bottom: 0; --dur: 2.6s;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAICAYAAACYhf2vAAACbklEQVR42mWSz08TURDHP/uz277ubmFb2XCAg4maED0bY6IJwcRw9+Df4sG7f4SePXHxaOKJICGRgB5qogEJ6IqVtsvrvn27LR6gK8r38p335jvzZt6M8XL78Vndc2i6NsfDjE5Q51SXZKr4x76MTlCvtFOc6pKma1f8P46H2ZUcp7rEePbuwVkqC+baDQBGWUEqC3zhVAzQqDuMsqJi4Ip/iuTXqLIv5/k/dq7dwP56mAKwdyhZ2Wjzcfn8fO1VSez7rC+fIOUYISykHLOy0eb93T5CWFx/bbKzKhHCYmnNZnMl584bh73VotIDCGGxd/hX5zouuw8lx32F8eLp/bOhVAB8eTLh3tsZADKVowuN0hO+PJmwtGYT+n7l+7A6YmnNRukJc1FI0hsQCI+6V2N9+aR6CEAXmvCimel93auRqRzr0e2F5zXXJi9KZj8ZjMcF+z97xNEMudZErQB365yT3oBmw8OxbdwtjW0Z2JaBV6thmcbFCDMmGxLbdDCMCVIVRK2ATOWI7TG2ZdAU5+MuyzEmwO5+QiA8+iOJ67jELZ+kN6B7dAJAILx/Fmja7Y9+Suj7DNKUoVTs7icoPWGhEwFUP5CpnKFUBMIj9H26B0dVLutWLJ7fmO8wlIqW8GiKBrnW/EpPiUO/6qwsx7QCQdIbMBeFOLaNY8LOXsL8bEhelMStBlEr4PdA4rkmTdGg2fAoyzF5UfL5ew/bgMW4Q/fgiDiawRyMSoZS4blmVdWPfkrc8gmEhy40Q6nQhSZTeaXLVI7ruCy2Q+peDc81cR23KnCqGaQpu/sJADfnz/drs/uNhU7EZvcbfwAY2DWNthdR9wAAAABJRU5ErkJggg==");
+}
+
+@keyframes pb-scroll {
+  to { transform: translate3d(calc(var(--tw) * var(--px) * -1), 0, 0); }
+}
+
+/* escurece a esquerda e a base para o texto e os botões ficarem legíveis */
+.pb-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(16, 12, 34, 0.62) 0%, rgba(16, 12, 34, 0.22) 45%, transparent 75%),
+    linear-gradient(0deg, rgba(16, 12, 34, 0.35), transparent 40%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pb-layer { animation: none; }
+}
