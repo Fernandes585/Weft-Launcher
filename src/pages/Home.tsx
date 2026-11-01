@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
 import { useI18n } from "../i18n/useI18n";
+import { getLocale } from "../i18n";
 import { useInstall } from "../hooks/useInstall";
 import { useGameState } from "../hooks/useGameState";
-   import { PixelBanner } from "../components/PixelBanner";
+import { PixelBanner } from "../components/PixelBanner";
 
 export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
   const { t } = useI18n();
@@ -44,8 +45,8 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
     return (
       <main className="page home-page">
         <section className="hero empty">
-          <PixelBanner />                                        
-          <h1>{t("appTitle")}</h1>
+          <PixelBanner />
+          <h1 className="hero-title">Weft</h1>
           <p className="empty-message">{t("noVersionsInstalled")}</p>
           <button className="btn-flat btn-primary" onClick={onGoToVersions}>
             {t("goToVersionsTab")}
@@ -58,13 +59,11 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
   return (
     <main className="page home-page">
       <section className="hero">
-        <PixelBanner />              
+        <PixelBanner />
         <div className="hero-header">
-          <div>
-            <h1 className="hero-title">Weft</h1>
-          </div>
+          <h1 className="hero-title">Weft</h1>
           <div className="hero-version-badge">
-            VERSÃO {selectedTag || installedVersions[0]?.tag || "—"} · PRONTO
+            {t("heroBadge", selectedTag || installedVersions[0]?.tag || "—")}
           </div>
         </div>
         <div className="hero-play-area">
@@ -116,7 +115,7 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
               <div className="detail-row">
                 <span className="detail-label">{t("installedAtLabel")}</span>
                 <span className="detail-value">
-                  {new Date(selectedVersion.installed_at).toLocaleString("pt-BR")}
+                  {new Date(selectedVersion.installed_at).toLocaleString(getLocale())}
                 </span>
               </div>
               <div className="detail-row">
@@ -127,20 +126,6 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
           ) : (
             <p className="select-version-hint">{t("selectVersionHint")}</p>
           )}
-        </div>
-      </section>
-
-      <section className="card">
-        <div className="card-header">
-          <h2 className="card-title">{t("gameFolderTitle")}</h2>
-        </div>
-        <div className="card-body">
-          <p className="detail-value path">{t("gameFolderPath")}</p>
-        </div>
-        <div className="card-actions">
-          <button className="btn-flat btn-secondary" disabled>
-            {t("openFolderButton")}
-          </button>
         </div>
       </section>
     </main>

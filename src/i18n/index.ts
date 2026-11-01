@@ -1,6 +1,7 @@
-type Locale = 'pt-BR' | 'en';
+export type Locale = 'pt-BR' | 'en' | 'es' | 'ru';
 
 interface I18nMessages {
+  heroBadge: string;
   appTitle: string;
   refreshButton: string;
   loading: string;
@@ -88,19 +89,28 @@ interface I18nMessages {
 
 import ptBR from './pt-BR.json';
 import en from './en.json';
+import es from './es.json';
+import ru from './ru.json';
 
 const messagesMap: Record<Locale, I18nMessages> = {
   'pt-BR': ptBR,
   en,
+  es,
+  ru,
 };
 
-let currentLocale: Locale = 'pt-BR';
-let messages: I18nMessages = messagesMap['pt-BR'];
+let currentLocale: Locale = 'en';
+let messages: I18nMessages = messagesMap.en;
 
 export function initI18n(locale?: Locale): void {
-  const savedLocale = localStorage.getItem('locale') as Locale | null;
-  const browserLocale = navigator.language.startsWith('pt') ? 'pt-BR' : 'en';
-  currentLocale = locale || savedLocale || browserLocale;
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem('locale');
+  } catch {
+    saved = null;
+  }
+  const candidate = (locale || saved) as Locale | null;
+  currentLocale = candidate && candidate in messagesMap ? candidate : 'en';
   messages = messagesMap[currentLocale];
 }
 
@@ -110,7 +120,11 @@ export function getLocale(): Locale {
 
 export function setLocale(locale: Locale): void {
   currentLocale = locale;
-  localStorage.setItem('locale', locale);
+  try {
+    localStorage.setItem('locale', locale);
+  } catch {
+    /* ignora */
+  }
   messages = messagesMap[locale];
 }
 

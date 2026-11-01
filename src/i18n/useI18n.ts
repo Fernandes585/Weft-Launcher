@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { t as translate, initI18n, getLocale, setLocale, formatSize as i18nFormatSize } from './index';
+import { t as translate, initI18n, getLocale, setLocale, formatSize as i18nFormatSize, Locale } from './index';
 
 export function useI18n() {
   const [ready, setReady] = useState(false);
@@ -11,11 +11,10 @@ export function useI18n() {
 
   const t = useCallback((key: string, ...args: string[]) => translate(key, ...args), []);
   const formatSize = useCallback((bytes: number) => i18nFormatSize(bytes), []);
-  
+
   const locale = getLocale();
-  const changeLocale = useCallback((newLocale: 'pt-BR' | 'en') => {
+  const changeLocale = useCallback((newLocale: Locale) => {
     setLocale(newLocale);
-    // Force re-render by reloading messages
     window.location.reload();
   }, []);
 

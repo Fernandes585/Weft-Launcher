@@ -1,0 +1,29 @@
+.sf {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 8px;
+  margin-top: auto;
+}
+.sf-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  text-align: left;
+}
+.sf-link:hover {
+  background: rgba(154, 134, 255, 0.12);
+}
+.sf-link svg {
+  flex: none;
+  opacity: 0.85;
+}
+.sf-version {
+  padding: 6px 10px 0;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}

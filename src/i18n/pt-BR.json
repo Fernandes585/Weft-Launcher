@@ -1,4 +1,5 @@
 {
+  "heroBadge": "VERSÃO {0} · PRONTO",
   "appTitle": "Weft Launcher",
   "refreshButton": "Atualizar lista",
   "loading": "Carregando...",
@@ -10,7 +11,7 @@
   "prereleaseBadge": "Pré-lançamento",
   "publishedDate": "Publicado em",
   "assetInfo": "Asset: {name} ({size})",
-  "sha256Label": "SHA256: {hash}",
+  "sha256Label": "SHA256: {0}",
   "changelogSummary": "Ver notas da versão",
   "installButton": "Instalar",
   "installedBadge": "Instalada",

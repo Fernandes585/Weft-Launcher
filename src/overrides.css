@@ -1,0 +1,186 @@
+
+:root {
+  --font-heading: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-label: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-pixel: 'Silkscreen', ui-monospace, monospace;
+}
+
+
+.home-page .hero {
+  text-align: right;
+}
+.home-page .hero-header {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+.home-page .hero-title {
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
+  margin: 0;
+}
+.home-page .hero-play-area {
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+.home-page .version-selector select,
+.home-page .btn-play {
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
+}
+.home-page .launch-error {
+  margin-left: auto;
+}
+
+
+.pb-sun {
+  right: auto;
+  left: 14%;
+}
+.pb-shade {
+  background:
+    linear-gradient(270deg, rgba(16, 12, 34, 0.62) 0%, rgba(16, 12, 34, 0.22) 45%, transparent 75%),
+    linear-gradient(0deg, rgba(16, 12, 34, 0.35), transparent 40%);
+}
+
+.tabs {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  gap: 4px;
+}
+.tabs .tab-btn:first-child {
+  margin-left: 0 !important;
+}
+.tabs .lang {
+  position: relative;
+  margin-left: auto;
+  align-self: center;
+  padding: 0 !important;
+  margin-top: 0px;
+}
+.tabs .lang-menu {
+  right: 0 !important;
+}
+.lang-btn {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  padding: 0.35rem 0.8rem;
+  background: var(--panel);
+  color: var(--text);
+  border: var(--border-width) solid var(--border);
+}
+.lang-btn:hover {
+  border-color: var(--accent);
+}
+.lang-menu {
+  position: absolute;
+  right: var(--gutter);
+  top: calc(100% + 4px);
+  z-index: 50;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 150px;
+  background: var(--panel);
+  border: var(--border-width) solid var(--border);
+}
+.lang-item {
+  display: flex;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+  color: var(--text);
+  font-family: var(--font-body);
+}
+.lang-item:hover {
+  background: var(--panel-lighter);
+}
+.lang-item.active strong {
+  color: var(--accent);
+}
+.lang-item span {
+  color: var(--text-dim);
+}
+img.instance-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: none;
+  border: 0;
+  flex: none;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+.tabs {
+  flex: none;
+  overflow: visible !important;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+.page {
+  overflow-y: auto;
+}
+
+
+.lang {
+  padding-right: 0;
+}
+.lang-menu {
+  right: 0;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+
+@media (max-width: 720px) {
+  .tab-btn {
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+    font-size: 0.8rem;
+  }
+}
+
+* {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.notes-page,
+.notes-page * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.version-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 1.2rem;
+}
+.version-meta > * {
+  line-height: 1.4;
+}
+.tabs {
+  padding-top: 0 !important;
+  align-items: stretch !important;
+}
+.tabs .tab-btn {
+  margin-top: 0 !important;
+  align-self: stretch;
+}
+.tabs .lang {
+  align-self: center;
+}
