@@ -14,7 +14,7 @@ interface NotesPageProps {
 }
 
 export function NotesPage({ releases }: NotesPageProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const sorted = [...releases].sort((a, b) =>
     new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
@@ -31,7 +31,7 @@ export function NotesPage({ releases }: NotesPageProps) {
             <article key={release.tag} className="note-entry">
               <header className="note-header">
                 <span className="note-tag">{release.tag}</span>
-                <span className="note-date">{formatDate(release.published_at)}</span>
+                <span className="note-date">{formatDate(release.published_at, locale)}</span>
                 {release.prerelease && <span className="prerelease-badge">{t("prereleaseBadge")}</span>}
               </header>
               <div className="note-body">

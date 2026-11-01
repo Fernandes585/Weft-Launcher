@@ -69,6 +69,8 @@
   "gameFolderTitle": "Carpeta del juego",
   "gameFolderPath": "Ruta de la carpeta del juego",
   "openFolderButton": "Abrir carpeta",
+  "gameClosedError": "El juego se cerró con error (código {0})",
+  "openLogButton": "Abrir registro",
   "heroBadge": "VERSIÓN {0} · LISTO",
   "errors": {
     "network": "Error de red: {0}",
@@ -80,7 +82,25 @@
     "missingDigest": "Falta el digest SHA256 en el archivo",
     "rateLimited": "Límite de la API de GitHub superado. Inténtalo más tarde.",
     "forbidden": "Acceso denegado a la API de GitHub (403). Usando caché si existe.",
-    "offlineNoCache": "Sin conexión y sin caché disponible"
+    "offlineNoCache": "Sin conexión y sin caché disponible",
+    "zip": "Error en ZIP: {0}",
+    "createDir": "Error al crear directorio: {0}",
+    "sha256Mismatch": "El SHA256 no coincide",
+    "hashMissing": "Falta el SHA256 obligatorio",
+    "alreadyInstalled": "Versión ya instalada: {0}",
+    "notInstalled": "Versión no instalada: {0}",
+    "downloadFailed": "Error de descarga: {0}",
+    "extractFailed": "Error de extracción: {0}",
+    "gameRunning": "Otro juego se está ejecutando: {0}. Ciérralo antes de iniciar otro.",
+    "versionInUse": "Versión en uso (archivo bloqueado): {0}. Cierra el juego para eliminarla.",
+    "alreadyRunning": "Esta versión ya se está ejecutando",
+    "anotherGameRunning": "Otro juego se está ejecutando: {0}",
+    "executableNotFound": "Ejecutable no encontrado: {0}",
+    "processSpawnFailed": "Error al iniciar proceso: {0}",
+    "logDirCreateFailed": "Error al crear directorio de logs: {0}",
+    "gameFolderNotFound": "Carpeta del juego no encontrada: {0}",
+    "unsupportedPlatform": "Ubicación de la carpeta del juego no confirmada en esta plataforma",
+    "openerError": "Error al abrir: {0}"
   },
   "sizeUnits": { "B": "B", "KB": "KB", "MB": "MB", "GB": "GB" }
 }

@@ -68,6 +68,12 @@ interface I18nMessages {
   inUseBadge: string;
   noChangelog: string;
   dismiss: string;
+  instancesTitle: string;
+  gameFolderTitle: string;
+  gameFolderPath: string;
+  openFolderButton: string;
+  gameClosedError: string;
+  openLogButton: string;
   errors: {
     network: string;
     io: string;
@@ -79,6 +85,24 @@ interface I18nMessages {
     rateLimited: string;
     forbidden: string;
     offlineNoCache: string;
+    zip: string;
+    createDir: string;
+    sha256Mismatch: string;
+    hashMissing: string;
+    alreadyInstalled: string;
+    notInstalled: string;
+    downloadFailed: string;
+    extractFailed: string;
+    gameRunning: string;
+    versionInUse: string;
+    alreadyRunning: string;
+    anotherGameRunning: string;
+    executableNotFound: string;
+    processSpawnFailed: string;
+    logDirCreateFailed: string;
+    gameFolderNotFound: string;
+    unsupportedPlatform: string;
+    openerError: string;
   };
   sizeUnits: {
     B: string;

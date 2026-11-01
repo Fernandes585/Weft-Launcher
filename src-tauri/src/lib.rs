@@ -1,9 +1,9 @@
 pub mod config;
+pub mod error;
 pub mod install;
 pub mod launch;
 pub mod releases;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -20,7 +20,9 @@ pub fn run() {
             install::get_installed_versions,
             install::remove_version,
             launch::launch_version,
-            launch::get_running_versions
+            launch::get_running_versions,
+            launch::open_game_folder,
+            launch::open_log
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

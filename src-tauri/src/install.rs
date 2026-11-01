@@ -12,6 +12,7 @@ use zip::result::ZipError;
 
 // Import from launch module to check running versions
 use crate::launch::is_version_running;
+use crate::error::AppError;
 
 const USER_AGENT_VALUE: &str = "weft-launcher/0.1.0";
 
@@ -55,12 +56,6 @@ pub enum InstallError {
     VersionInUse(String),
 }
 
-impl From<InstallError> for String {
-    fn from(err: InstallError) -> String {
-        err.to_string()
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstalledVersion {
     pub tag: String,
@@ -98,16 +93,12 @@ pub async fn install_version(
     asset_url: String,
     asset_name: String,
     expected_sha256: Option<String>,
-) -> Result<InstalledVersion, String> {
+) -> Result<InstalledVersion, AppError> {
     let versions_dir = get_versions_dir(&app_handle)?;
     let downloads_dir = get_downloads_dir(&app_handle)?;
 
-    fs::create_dir_all(&versions_dir)
-        .await
-        .map_err(|e| e.to_string())?;
-    fs::create_dir_all(&downloads_dir)
-        .await
-        .map_err(|e| e.to_string())?;
+    fs::create_dir_all(&versions_dir).await?;
+    fs::create_dir_all(&downloads_dir).await?;
 
     let version_dir = versions_dir.join(&tag);
     let executable_name = if cfg!(target_os = "windows") {
@@ -119,20 +110,18 @@ pub async fn install_version(
 
     // Check if already properly installed (directory exists AND executable exists)
     if executable_path.exists() {
-        return Err(InstallError::AlreadyInstalled(tag).to_string());
+        return Err(InstallError::AlreadyInstalled(tag).into());
     }
 
     // Directory exists but executable is missing -> remove stale directory and reinstall
     if version_dir.exists() {
-        fs::remove_dir_all(&version_dir)
-            .await
-            .map_err(|e| InstallError::Io(e).to_string())?;
+        fs::remove_dir_all(&version_dir).await?;
     }
 
     // Require SHA256
     let expected_sha256 = expected_sha256
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| InstallError::HashMissing.to_string())?;
+        .ok_or_else(|| InstallError::HashMissing)?;
 
     // Download to temp file with progress
     let temp_download = downloads_dir.join(format!("{}.tmp", &asset_name));
@@ -140,8 +129,7 @@ pub async fn install_version(
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build()?;
 
     let response = client
         .get(&asset_url)
@@ -152,9 +140,7 @@ pub async fn install_version(
 
     if !response.status().is_success() {
         cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-        return Err(
-            InstallError::DownloadFailed(format!("HTTP {}", response.status())).to_string(),
-        );
+        return Err(InstallError::DownloadFailed(format!("HTTP {}", response.status())).into());
     }
 
     let total_size = response.content_length().unwrap_or(0);
@@ -166,29 +152,14 @@ pub async fn install_version(
     #[cfg(debug_assertions)]
     let download_start = std::time::Instant::now();
 
-    let mut file = match fs::File::create(&temp_download).await {
-        Ok(f) => f,
-        Err(e) => {
-            cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-            return Err(InstallError::DownloadFailed(e.to_string()).to_string());
-        }
-    };
+    let mut file = fs::File::create(&temp_download).await?;
 
     // Stream download with progress
     let mut stream = response.bytes_stream();
     while let Some(chunk_result) = stream.next().await {
-        let chunk = match chunk_result {
-            Ok(c) => c,
-            Err(e) => {
-                cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-                return Err(InstallError::DownloadFailed(e.to_string()).to_string());
-            }
-        };
+        let chunk = chunk_result?;
 
-        if let Err(e) = file.write_all(&chunk).await {
-            cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-            return Err(InstallError::DownloadFailed(e.to_string()).to_string());
-        }
+        file.write_all(&chunk).await?;
 
         downloaded += chunk.len() as u64;
 
@@ -253,10 +224,7 @@ pub async fn install_version(
         }
     }
 
-    if let Err(e) = file.flush().await {
-        cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-        return Err(InstallError::DownloadFailed(e.to_string()).to_string());
-    }
+    file.flush().await?;
     drop(file);
 
     // Final download progress
@@ -273,23 +241,11 @@ pub async fn install_version(
     );
 
     // Verify SHA256
-    let mut file = match fs::File::open(&temp_download).await {
-        Ok(f) => f,
-        Err(e) => {
-            cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-            return Err(InstallError::DownloadFailed(e.to_string()).to_string());
-        }
-    };
+    let mut file = fs::File::open(&temp_download).await?;
     let mut hasher = Sha256::new();
     let mut buffer = vec![0u8; 8192];
     loop {
-        let n = match file.read(&mut buffer).await {
-            Ok(n) => n,
-            Err(e) => {
-                cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-                return Err(InstallError::DownloadFailed(e.to_string()).to_string());
-            }
-        };
+        let n = file.read(&mut buffer).await?;
         if n == 0 {
             break;
         }
@@ -302,7 +258,7 @@ pub async fn install_version(
             expected: expected_sha256,
             actual,
         }
-        .to_string());
+        .into());
     }
     drop(file);
 
@@ -320,15 +276,9 @@ pub async fn install_version(
     );
 
     if temp_extract.exists() {
-        if let Err(e) = fs::remove_dir_all(&temp_extract).await {
-            cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-            return Err(InstallError::ExtractFailed(e.to_string()).to_string());
-        }
+        fs::remove_dir_all(&temp_extract).await?;
     }
-    if let Err(e) = fs::create_dir_all(&temp_extract).await {
-        cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-        return Err(InstallError::ExtractFailed(e.to_string()).to_string());
-    }
+    fs::create_dir_all(&temp_extract).await?;
 
     // Extract based on file extension
     let extract_result = if asset_name.ends_with(".zip") {
@@ -338,20 +288,14 @@ pub async fn install_version(
     } else {
         cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
         return Err(
-            InstallError::ExtractFailed("Formato de arquivo não suportado".to_string()).to_string(),
+            InstallError::ExtractFailed("Formato de arquivo não suportado".to_string()).into(),
         );
     };
 
-    if let Err(e) = extract_result {
-        cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-        return Err(e.to_string());
-    }
+    extract_result?;
 
     // Normalize structure (handle top-level folder)
-    if let Err(e) = normalize_install_structure(&temp_extract, &tag).await {
-        cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-        return Err(e.to_string());
-    }
+    normalize_install_structure(&temp_extract, &tag).await?;
 
     // Verify executable exists in temp directory before finalizing
     let temp_executable = temp_extract.join(&executable_name);
@@ -372,11 +316,13 @@ pub async fn install_version(
             format!(" (primeiros itens: {})", items.join(", "))
         };
         cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-        return Err(InstallError::ExtractFailed(format!(
-            "Executável não encontrado após extração{}",
-            items_str
-        ))
-        .to_string());
+        return Err(
+            InstallError::ExtractFailed(format!(
+                "Executável não encontrado após extração{}",
+                items_str
+            ))
+            .into(),
+        );
     }
 
     // Finalizing
@@ -394,15 +340,9 @@ pub async fn install_version(
 
     // Atomic rename
     if version_dir.exists() {
-        if let Err(e) = fs::remove_dir_all(&version_dir).await {
-            cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-            return Err(InstallError::ExtractFailed(e.to_string()).to_string());
-        }
+        fs::remove_dir_all(&version_dir).await?;
     }
-    if let Err(e) = fs::rename(&temp_extract, &version_dir).await {
-        cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
-        return Err(InstallError::ExtractFailed(e.to_string()).to_string());
-    }
+    fs::rename(&temp_extract, &version_dir).await?;
 
     // Clean up temp download
     fs::remove_file(&temp_download).await.ok();
@@ -566,7 +506,7 @@ async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(
 #[tauri::command]
 pub async fn get_installed_versions(
     app_handle: tauri::AppHandle,
-) -> Result<Vec<InstalledVersion>, String> {
+) -> Result<Vec<InstalledVersion>, AppError> {
     let versions_dir = get_versions_dir(&app_handle)?;
 
     if !versions_dir.exists() {
@@ -574,11 +514,9 @@ pub async fn get_installed_versions(
     }
 
     let mut versions = Vec::new();
-    let mut entries = fs::read_dir(&versions_dir)
-        .await
-        .map_err(|e| e.to_string())?;
+    let mut entries = fs::read_dir(&versions_dir).await?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+    while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         if !path.is_dir() {
             continue;
@@ -593,7 +531,7 @@ pub async fn get_installed_versions(
         let executable = path.join(executable_name);
 
         if executable.exists() {
-            let metadata = fs::metadata(&path).await.map_err(|e| e.to_string())?;
+            let metadata = fs::metadata(&path).await?;
             let installed_at = metadata
                 .created()
                 .ok()
@@ -623,17 +561,17 @@ pub async fn get_installed_versions(
 }
 
 #[tauri::command]
-pub async fn remove_version(app_handle: tauri::AppHandle, tag: String) -> Result<(), String> {
+pub async fn remove_version(app_handle: tauri::AppHandle, tag: String) -> Result<(), AppError> {
     let versions_dir = get_versions_dir(&app_handle)?;
     let version_dir = versions_dir.join(&tag);
 
     if !version_dir.exists() {
-        return Err(InstallError::NotInstalled(tag).to_string());
+        return Err(InstallError::NotInstalled(tag).into());
     }
 
     // Check if version is currently running
     if is_version_running(&app_handle, &tag).await {
-        return Err(InstallError::GameRunning(tag).to_string());
+        return Err(InstallError::GameRunning(tag).into());
     }
 
     // Try to rename the folder first (atomic on Windows, fails if file in use)
@@ -641,9 +579,7 @@ pub async fn remove_version(app_handle: tauri::AppHandle, tag: String) -> Result
     match fs::rename(&version_dir, &removing_dir).await {
         Ok(_) => {
             // Rename succeeded, now delete the renamed folder
-            fs::remove_dir_all(&removing_dir)
-                .await
-                .map_err(|e| InstallError::Io(e).to_string())?;
+            fs::remove_dir_all(&removing_dir).await?;
             Ok(())
         }
         Err(e) => {
@@ -654,9 +590,9 @@ pub async fn remove_version(app_handle: tauri::AppHandle, tag: String) -> Result
                 || e.raw_os_error() == Some(26)
             // ETXTBSY on Unix
             {
-                Err(InstallError::VersionInUse(tag).to_string())
+                Err(InstallError::VersionInUse(tag).into())
             } else {
-                Err(InstallError::Io(e).to_string())
+                Err(e.into())
             }
         }
     }

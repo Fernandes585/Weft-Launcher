@@ -1,6 +1,7 @@
 import { useI18n } from "../i18n/useI18n";
 import { useInstall } from "../hooks/useInstall";
 import { VersionActions } from "../components/VersionActions";
+import { translateError } from "../i18n/errors";
 
 interface Release {
   tag: string;
@@ -32,7 +33,7 @@ export function VersionsPage({
   fromCache,
   onRefresh,
 }: VersionsPageProps) {
-  const { t, formatSize: fmtSize } = useI18n();
+  const { t, formatSize: fmtSize, locale } = useI18n();
   const { installedVersions, refreshInstalled } = useInstall();
 
   const installedMap = new Map(installedVersions.map((v) => [v.tag, v]));
@@ -51,7 +52,7 @@ export function VersionsPage({
           )}
           {error && (
             <div className="error-banner" role="alert">
-              {t("errorPrefix")}{error}
+              {t("errorPrefix")}{translateError(error)}
             </div>
           )}
           <button className="btn-refresh" onClick={() => onRefresh(true)} disabled={loading}>
@@ -83,7 +84,7 @@ export function VersionsPage({
                   </div>
                   <div className="version-meta">
                     <span className="version-date">
-                      {t("publishedDate")} {new Date(release.published_at).toLocaleDateString("pt-BR")}
+                      {t("publishedDate")} {new Date(release.published_at).toLocaleDateString(locale)}
                     </span>
                     <span className="version-size">
                       {t("sizeLabel")} {fmtSize(asset.size)}

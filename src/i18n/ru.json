@@ -69,6 +69,8 @@
   "gameFolderTitle": "Папка игры",
   "gameFolderPath": "Путь к папке игры",
   "openFolderButton": "Открыть папку",
+  "gameClosedError": "Игра закрылась с ошибкой (код {0})",
+  "openLogButton": "Открыть лог",
   "heroBadge": "ВЕРСИЯ {0} · ГОТОВО",
   "errors": {
     "network": "Ошибка сети: {0}",
@@ -80,7 +82,25 @@
     "missingDigest": "В файле отсутствует SHA256",
     "rateLimited": "Превышен лимит запросов к API GitHub. Повторите позже.",
     "forbidden": "Доступ к API GitHub запрещён (403). Используется кэш, если он есть.",
-    "offlineNoCache": "Нет сети и нет кэша"
+    "offlineNoCache": "Нет сети и нет кэша",
+    "zip": "Ошибка ZIP: {0}",
+    "createDir": "Не удалось создать директорию: {0}",
+    "sha256Mismatch": "SHA256 не совпадает",
+    "hashMissing": "Не указан обязательный SHA256",
+    "alreadyInstalled": "Версия уже установлена: {0}",
+    "notInstalled": "Версия не установлена: {0}",
+    "downloadFailed": "Ошибка загрузки: {0}",
+    "extractFailed": "Ошибка распаковки: {0}",
+    "gameRunning": "Уже запущена другая игра: {0}. Закройте её перед запуском новой.",
+    "versionInUse": "Версия используется (файл заблокирован): {0}. Закройте игру, чтобы удалить.",
+    "alreadyRunning": "Эта версия уже запущена",
+    "anotherGameRunning": "Уже запущена другая игра: {0}",
+    "executableNotFound": "Исполняемый файл не найден: {0}",
+    "processSpawnFailed": "Не удалось запустить процесс: {0}",
+    "logDirCreateFailed": "Не удалось создать директорию для логов: {0}",
+    "gameFolderNotFound": "Папка игры не найдена: {0}",
+    "unsupportedPlatform": "Расположение папки игры не подтверждено на этой платформе",
+    "openerError": "Не удалось открыть: {0}"
   },
   "sizeUnits": { "B": "Б", "KB": "КБ", "MB": "МБ", "GB": "ГБ" }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { getLocale, setLocale, Locale } from "../i18n";
+import { useI18n } from "../i18n/useI18n";
 
-const OPTIONS: { code: Locale; label: string; name: string }[] = [
+const OPTIONS: { code: 'pt-BR' | 'en' | 'es' | 'ru'; label: string; name: string }[] = [
   { code: "en", label: "EN", name: "English" },
   { code: "pt-BR", label: "BR", name: "Português" },
   { code: "es", label: "ES", name: "Español" },
@@ -11,8 +11,7 @@ const OPTIONS: { code: Locale; label: string; name: string }[] = [
 export function LanguageMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const current = getLocale();
-  const currentLabel = OPTIONS.find((o) => o.code === current)?.label ?? "EN";
+  const { locale, changeLocale } = useI18n();
 
   useEffect(() => {
     if (!open) return;
@@ -30,19 +29,20 @@ export function LanguageMenu() {
     };
   }, [open]);
 
-  const choose = (code: Locale) => {
+  const choose = (code: 'pt-BR' | 'en' | 'es' | 'ru') => {
     setOpen(false);
-    if (code === current) return;
-    setLocale(code);
-    window.location.reload();
+    if (code === locale) return;
+    changeLocale(code);
   };
+
+  const currentLabel = OPTIONS.find((o) => o.code === locale)?.label ?? "EN";
 
   return (
     <div className="lang" ref={ref}>
       <button
         type="button"
         className="lang-btn"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((o: boolean) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -51,10 +51,10 @@ export function LanguageMenu() {
       {open && (
         <ul className="lang-menu" role="listbox">
           {OPTIONS.map((o) => (
-            <li key={o.code} role="option" aria-selected={o.code === current}>
+            <li key={o.code} role="option" aria-selected={o.code === locale}>
               <button
                 type="button"
-                className={`lang-item${o.code === current ? " active" : ""}`}
+                className={`lang-item${o.code === locale ? " active" : ""}`}
                 onClick={() => choose(o.code)}
               >
                 <strong>{o.label}</strong> <span>{o.name}</span>

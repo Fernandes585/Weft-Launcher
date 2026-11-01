@@ -1,4 +1,5 @@
 use crate::config::WEFT_REPO;
+use crate::error::AppError;
 use reqwest::header::{
     ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, InvalidHeaderValue, USER_AGENT,
 };
@@ -245,13 +246,13 @@ async fn save_cache(
 pub async fn list_versions(
     app_handle: tauri::AppHandle,
     force_refresh: bool,
-) -> Result<Vec<Release>, String> {
+) -> Result<Vec<Release>, AppError> {
     let client = reqwest::Client::builder()
         .timeout(GITHUB_API_TIMEOUT)
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(ReleasesError::Network)?;
 
-    let cached = load_cache(&app_handle).await.map_err(|e| e.to_string())?;
+    let cached = load_cache(&app_handle).await?;
 
     if !force_refresh && let Some(cached) = cached {
         let mut releases = cached.releases;
@@ -278,9 +279,7 @@ pub async fn list_versions(
             };
 
             if !final_releases.is_empty() {
-                save_cache(&app_handle, new_etag, &final_releases)
-                    .await
-                    .map_err(|e| e.to_string())?;
+                save_cache(&app_handle, new_etag, &final_releases).await?;
             }
 
             Ok(final_releases)
@@ -293,7 +292,7 @@ pub async fn list_versions(
                 }
                 Ok(releases)
             } else {
-                Err(e.to_string())
+                Err(e.into())
             }
         }
     }

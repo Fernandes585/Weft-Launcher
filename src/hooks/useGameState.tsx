@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { translateError } from "../i18n/errors";
 
 interface GameStateEvent {
   tag: string;
@@ -69,7 +70,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       await invoke("launch_version", { tag });
       return null; // success
     } catch (err) {
-      return err as string;
+      return translateError(err);
     }
   }, []);
 

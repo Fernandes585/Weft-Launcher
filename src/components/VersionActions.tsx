@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useInstall, InstalledVersion, InstallProgress } from "../hooks/useInstall";
 import { useGameState } from "../hooks/useGameState";
-import { t } from "../i18n";
+import { useI18n } from "../i18n/useI18n";
+import { translateError } from "../i18n/errors";
 import { listen } from "@tauri-apps/api/event";
 
 interface VersionActionsProps {
@@ -25,6 +26,7 @@ export function VersionActions({
   onInstallStart,
   onInstallComplete,
 }: VersionActionsProps) {
+  const { t } = useI18n();
   const {
     error,
     loading,
@@ -41,24 +43,6 @@ export function VersionActions({
 
   const isCurrentlyInstalling = loading && localProgress?.stage !== "done" && localProgress?.stage !== "error";
   const thisVersionRunning = isRunning(release.tag);
-
-  const translateLaunchError = useCallback((err: string): string => {
-    if (err.startsWith("Versão já está rodando:") || err.startsWith("This version is already running:")) {
-      return t("errorAlreadyRunning");
-    }
-    if (err.startsWith("Outro jogo já está rodando:") || err.startsWith("Another game is running:")) {
-      const match = err.match(/rodando:\s*(.+)$|running:\s*(.+)$/i);
-      const otherTag = match?.[1] || match?.[2] || "";
-      return t("errorGameRunning", otherTag);
-    }
-    if (err.startsWith("Executável não encontrado:") || err.startsWith("Executable not found:")) {
-      return t("errorExecutableNotFound", err.replace(/^(Executável não encontrado:|Executable not found:)\s*/, ""));
-    }
-    if (err.startsWith("Versão em uso") || err.startsWith("Version in use")) {
-      return t("errorVersionInUse", release.tag);
-    }
-    return err;
-  }, [release.tag]);
 
   useEffect(() => {
     if (confirmDelete) {
@@ -137,7 +121,7 @@ useEffect(() => {
     setLaunchError(null);
     const err = await launch(release.tag);
     if (err) {
-      setLaunchError(translateLaunchError(err));
+      setLaunchError(translateError(err));
     }
   };
 

@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useI18n } from "../i18n/useI18n";
-import { getLocale } from "../i18n";
+import { translateError } from "../i18n/errors";
 import { useInstall } from "../hooks/useInstall";
 import { useGameState } from "../hooks/useGameState";
 import { PixelBanner } from "../components/PixelBanner";
@@ -19,17 +21,59 @@ function compareTags(a: string, b: string) {
 }
 
 export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { installedVersions } = useInstall();
   const { anyRunning, isRunning, launch } = useGameState();
 
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [launchError, setLaunchError] = useState<string | null>(null);
+  const [gameError, setGameError] = useState<{ tag: string; exitCode: number } | null>(null);
 
   const sortedVersions = useMemo(
   () => [...installedVersions].sort((a, b) => compareTags(b.tag, a.tag)),
   [installedVersions]
-);
+  );
+
+  // Initialize selectedTag from localStorage (lastPlayed) on mount
+  useEffect(() => {
+    try {
+      const lastPlayed = localStorage.getItem("lastPlayed");
+      if (lastPlayed && installedVersions.some((v) => v.tag === lastPlayed)) {
+        setSelectedTag(lastPlayed);
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [installedVersions]);
+
+  // Listen for game-state events to detect error exit codes
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let mounted = true;
+
+    listen<{ tag: string; state: string; exit_code: number | null }>("game-state", (event) => {
+      if (!mounted) return;
+      const { tag, state, exit_code } = event.payload;
+      if (state === "stopped" && exit_code !== null) {
+        // Only show error for CLEARLY abnormal exits:
+        // - Negative exit codes on Windows = exception codes (e.g., -1073741819 = Access Violation, STATUS_DLL_NOT_FOUND, etc.)
+        // - Codes >= 128 = Unix signals (128 + signal number, e.g., SIGSEGV=11 -> 139, SIGKILL=9 -> 137)
+        // All small positive codes (0, 1, 2, 3... up to 127) = normal closes (X button, Alt+F4, Quit Game, etc.)
+        // Weft may return various small codes for normal shutdown depending on code path.
+        const isLikelyCrash = exit_code < 0 || exit_code >= 128;
+        if (isLikelyCrash) {
+          setGameError({ tag, exitCode: exit_code });
+        }
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      mounted = false;
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   const effectiveTag = selectedTag ?? sortedVersions[0]?.tag ?? null;
 
@@ -40,21 +84,36 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
 
   const handleLaunch = async (tag: string) => {
     setLaunchError(null);
+    setGameError(null);
     const err = await launch(tag);
     if (err) {
-      if (err.startsWith("Versão já está rodando:") || err.startsWith("This version is already running:")) {
-        setLaunchError(t("errorAlreadyRunning"));
-      } else if (err.startsWith("Outro jogo já está rodando:") || err.startsWith("Another game is running:")) {
-        const match = err.match(/rodando:\s*(.+)$|running:\s*(.+)$/i);
-        const otherTag = match?.[1] || match?.[2] || "";
-        setLaunchError(t("errorGameRunning", otherTag));
-      } else if (err.startsWith("Executável não encontrado:") || err.startsWith("Executable not found:")) {
-        setLaunchError(t("errorExecutableNotFound", err.replace(/^(Executável não encontrado:|Executable not found:)\s*/, "")));
-      } else if (err.startsWith("Versão em uso") || err.startsWith("Version in use")) {
-        setLaunchError(t("errorVersionInUse", tag));
-      } else {
-        setLaunchError(err);
+      setLaunchError(translateError(err));
+    } else {
+      // Save lastPlayed on successful launch
+      try {
+        localStorage.setItem("lastPlayed", tag);
+      } catch {
+        // ignore localStorage errors
       }
+    }
+  };
+
+  const handleOpenLog = async (tag: string) => {
+    setGameError(null);
+    try {
+      await invoke("open_log", { tag });
+    } catch (err) {
+      setLaunchError(translateError(err));
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    if (!effectiveTag) return;
+    setLaunchError(null);
+    try {
+      await invoke("open_game_folder", { tag: effectiveTag });
+    } catch (err) {
+      setLaunchError(translateError(err));
     }
   };
 
@@ -118,6 +177,14 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
             {launchError}
           </div>
         )}
+        {gameError && (
+          <div className="launch-error" role="alert">
+            <span>{t("gameClosedError", String(gameError.exitCode))}</span>
+            <button className="btn-flat btn-secondary" onClick={() => handleOpenLog(gameError.tag)}>
+              {t("openLogButton")}
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="card">
@@ -134,12 +201,19 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
               <div className="detail-row">
                 <span className="detail-label">{t("installedAtLabel")}</span>
                 <span className="detail-value">
-                  {new Date(selectedVersion.installed_at).toLocaleString(getLocale())}
+                  {new Date(selectedVersion.installed_at).toLocaleString(locale)}
                 </span>
               </div>
               <div className="detail-row">
                 <span className="detail-label">{t("executableLabel")}</span>
                 <span className="detail-value path">{selectedVersion.executable}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">{t("gameFolderTitle")}</span>
+                <span className="detail-value path">{t("gameFolderPath")}</span>
+                <button className="btn-flat btn-secondary" onClick={handleOpenFolder}>
+                  {t("openFolderButton")}
+                </button>
               </div>
             </>
           ) : (

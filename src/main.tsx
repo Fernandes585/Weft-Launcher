@@ -20,10 +20,14 @@ document.addEventListener("keydown", (e) => {
   if (blocked) e.preventDefault();
 });
 
+import { I18nProvider } from "./i18n/I18nProvider";
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <GameStateProvider>
-      <App />
-    </GameStateProvider>
+    <I18nProvider>
+      <GameStateProvider>
+        <App />
+      </GameStateProvider>
+    </I18nProvider>
   </React.StrictMode>,
 );

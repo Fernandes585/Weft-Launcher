@@ -3,11 +3,13 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_opener::{OpenerExt, Error as OpenerError};
 use thiserror::Error;
 use tokio::fs;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command as TokioCommand;
 use tokio::sync::mpsc;
+use crate::error::AppError;
 
 #[derive(Debug, Error)]
 pub enum LaunchError {
@@ -23,12 +25,12 @@ pub enum LaunchError {
     ProcessSpawnFailed(String),
     #[error("Erro ao criar diretório de logs: {0}")]
     LogDirCreateFailed(String),
-}
-
-impl From<LaunchError> for String {
-    fn from(err: LaunchError) -> String {
-        err.to_string()
-    }
+    #[error("Pasta do jogo não encontrada: {0}")]
+    GameFolderNotFound(String),
+    #[error("Plataforma não suportada: {0}")]
+    UnsupportedPlatform(String),
+    #[error("Erro ao abrir pasta: {0}")]
+    OpenerError(#[from] OpenerError),
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -102,7 +104,7 @@ fn get_logs_dir(app_handle: &AppHandle) -> Result<PathBuf, LaunchError> {
 }
 
 #[tauri::command]
-pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), String> {
+pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), AppError> {
     let versions_dir = get_versions_dir(&app_handle)?;
     let version_dir = versions_dir.join(&tag);
     let executable_name = if cfg!(target_os = "windows") {
@@ -113,7 +115,7 @@ pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), St
     let executable = version_dir.join(executable_name);
 
     if !executable.exists() {
-        return Err(LaunchError::ExecutableNotFound(tag).to_string());
+        return Err(LaunchError::ExecutableNotFound(tag).into());
     }
 
     let process_map = get_process_state(&app_handle)?;
@@ -124,12 +126,12 @@ pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), St
 
         // Check if THIS version is already running
         if map.contains_key(&tag) {
-            return Err(LaunchError::AlreadyRunning(tag).to_string());
+            return Err(LaunchError::AlreadyRunning(tag).into());
         }
 
         // Check if ANY other game is running (global single-instance)
         if let Some((running_tag, _)) = map.iter().next() {
-            return Err(LaunchError::AnotherGameRunning(running_tag.clone()).to_string());
+            return Err(LaunchError::AnotherGameRunning(running_tag.clone()).into());
         }
     } // lock released here
 
@@ -140,8 +142,7 @@ pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), St
         .create(true)
         .append(true)
         .open(&log_path)
-        .await
-        .map_err(|e| LaunchError::Io(e))?;
+        .await?;
 
     // Prepare command
     let mut cmd = TokioCommand::new(&executable);
@@ -166,15 +167,14 @@ pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), St
     let stdout = child.stdout.take().expect("stdout not captured");
     let stderr = child.stderr.take().expect("stderr not captured");
 
-    let log_file_clone = log_file.try_clone().await.map_err(|e| LaunchError::Io(e))?;
+    let log_file_clone = log_file.try_clone().await?;
 
     let (tx, _rx) = mpsc::channel::<()>(1);
 
     // Spawn stdout logging task
     let log_file_stdout = log_file_clone
         .try_clone()
-        .await
-        .map_err(|e| LaunchError::Io(e))?;
+        .await?;
     tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
         let mut log_file = log_file_stdout;
@@ -187,8 +187,7 @@ pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), St
     // Spawn stderr logging task
     let log_file_stderr = log_file_clone
         .try_clone()
-        .await
-        .map_err(|e| LaunchError::Io(e))?;
+        .await?;
     tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
         let mut log_file = log_file_stderr;
@@ -250,8 +249,37 @@ pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), St
 }
 
 #[tauri::command]
-pub async fn get_running_versions(app_handle: AppHandle) -> Result<Vec<String>, String> {
+pub async fn get_running_versions(app_handle: AppHandle) -> Result<Vec<String>, AppError> {
     let process_map = get_process_state(&app_handle)?;
     let map = process_map.lock().unwrap();
     Ok(map.keys().cloned().collect())
+}
+
+#[tauri::command]
+pub async fn open_game_folder(app_handle: AppHandle, tag: String) -> Result<(), AppError> {
+    #[cfg(target_os = "windows")]
+    {
+        let versions_dir = get_versions_dir(&app_handle)?;
+        let version_dir = versions_dir.join(&tag);
+        if !version_dir.exists() {
+            return Err(LaunchError::GameFolderNotFound(version_dir.display().to_string()).into());
+        }
+        app_handle.opener().open_path(version_dir.to_string_lossy().as_ref(), None::<&str>).map_err(LaunchError::OpenerError)?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err(LaunchError::UnsupportedPlatform("Game folder location not confirmed on this platform".to_string()).into())
+    }
+}
+
+#[tauri::command]
+pub async fn open_log(app_handle: AppHandle, tag: String) -> Result<(), AppError> {
+    let logs_dir = get_logs_dir(&app_handle)?;
+    let log_file = logs_dir.join(format!("{}.log", tag));
+    if !log_file.exists() {
+        return Err(LaunchError::GameFolderNotFound(format!("Log file not found: {}", log_file.display())).into());
+    }
+    app_handle.opener().open_path(log_file.to_string_lossy().as_ref(), None::<&str>).map_err(LaunchError::OpenerError)?;
+    Ok(())
 }
