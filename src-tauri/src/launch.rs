@@ -41,10 +41,10 @@ pub struct GameStateEvent {
     pub exit_code: Option<i32>,
 }
 
-struct RunningProcess {
-    tag: String,
+pub struct RunningProcess {
+    _tag: String,
     child: tokio::process::Child,
-    log_file: tokio::fs::File,
+    _log_file: tokio::fs::File,
     tx: mpsc::Sender<()>,
 }
 
@@ -199,9 +199,9 @@ pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), Ap
 
     // Store process in map
     let running_process = RunningProcess {
-        tag: tag_clone.clone(),
+        _tag: tag_clone.clone(),
         child,
-        log_file: log_file_clone,
+        _log_file: log_file_clone,
         tx,
     };
 

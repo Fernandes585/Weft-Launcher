@@ -6,19 +6,7 @@ import { translateError } from "../i18n/errors";
 import { useInstall } from "../hooks/useInstall";
 import { useGameState } from "../hooks/useGameState";
 import { PixelBanner } from "../components/PixelBanner";
-
-const parseTag = (s: string) =>
-  s.replace(/^v/i, "").split(/[.\-]/).map((n) => parseInt(n, 10) || 0);
-
-function compareTags(a: string, b: string) {
-  const x = parseTag(a);
-  const y = parseTag(b);
-  for (let i = 0; i < Math.max(x.length, y.length); i++) {
-    const d = (x[i] || 0) - (y[i] || 0);
-    if (d) return d;
-  }
-  return 0;
-}
+import { compareTags } from "../utils/version";
 
 export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
   const { t, locale } = useI18n();

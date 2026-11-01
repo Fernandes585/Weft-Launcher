@@ -124,8 +124,8 @@ pub async fn install_version(
         .ok_or_else(|| InstallError::HashMissing)?;
 
     // Download to temp file with progress
-    let temp_download = downloads_dir.join(format!("{}.tmp", &asset_name));
-    let temp_extract = versions_dir.join(format!(".tmp-{}", &tag));
+    let temp_download = downloads_dir.join(format!("{}.tmp", asset_name));
+    let temp_extract = versions_dir.join(format!(".tmp-{}", tag));
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(300))
@@ -166,7 +166,7 @@ pub async fn install_version(
         // Throttle progress: emit every ~1% or 100KB
         let should_report = if total_size > 0 {
             let percent = ((downloaded as f64 / total_size as f64) * 100.0) as u32;
-            percent >= last_reported_percent + 1
+            percent > last_reported_percent
         } else {
             downloaded >= last_reported_bytes + 100_000
         };
@@ -208,17 +208,16 @@ pub async fn install_version(
 
         #[cfg(debug_assertions)]
         {
-            if let Ok(val) = std::env::var("WEFT_THROTTLE_KBPS") {
-                if let Ok(kbps) = val.parse::<f64>() {
-                    if kbps > 0.0 {
-                        let bytes_per_sec = kbps * 1024.0;
-                        let expected_duration = downloaded as f64 / bytes_per_sec;
-                        let actual_duration = download_start.elapsed().as_secs_f64();
-                        if expected_duration > actual_duration {
-                            let sleep_secs = expected_duration - actual_duration;
-                            tokio::time::sleep(std::time::Duration::from_secs_f64(sleep_secs)).await;
-                        }
-                    }
+            if let Ok(val) = std::env::var("WEFT_THROTTLE_KBPS")
+                && let Ok(kbps) = val.parse::<f64>()
+                && kbps > 0.0
+            {
+                let bytes_per_sec = kbps * 1024.0;
+                let expected_duration = downloaded as f64 / bytes_per_sec;
+                let actual_duration = download_start.elapsed().as_secs_f64();
+                if expected_duration > actual_duration {
+                    let sleep_secs = expected_duration - actual_duration;
+                    tokio::time::sleep(std::time::Duration::from_secs_f64(sleep_secs)).await;
                 }
             }
         }
@@ -298,7 +297,7 @@ pub async fn install_version(
     normalize_install_structure(&temp_extract, &tag).await?;
 
     // Verify executable exists in temp directory before finalizing
-    let temp_executable = temp_extract.join(&executable_name);
+    let temp_executable = temp_extract.join(executable_name);
     if !temp_executable.exists() {
         // List first 10 items in temp directory for diagnostics
         let mut items = Vec::new();
@@ -390,7 +389,7 @@ async fn extract_zip(zip_path: PathBuf, dest: PathBuf) -> Result<(), InstallErro
                 ));
             }
 
-            let target_path = dest.join(&entry_path);
+            let target_path = dest.join(entry_path);
 
             if entry.is_dir() {
                 std::fs::create_dir_all(&target_path)?;
@@ -447,7 +446,7 @@ async fn extract_tar_gz(tar_gz_path: PathBuf, dest: PathBuf) -> Result<(), Insta
                 ));
             }
 
-            let target_path = dest.join(&entry_path);
+            let target_path = dest.join(entry_path);
 
             if entry.header().entry_type().is_dir() {
                 std::fs::create_dir_all(&target_path)?;
@@ -487,17 +486,16 @@ async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(
     }
 
     // If there's exactly one folder at root, move its contents up
-    if entry_count == 1 {
-        if let Some(single_dir) = first_entry {
-            if single_dir.is_dir() {
-                let mut entries = fs::read_dir(&single_dir).await?;
-                while let Some(entry) = entries.next_entry().await? {
-                    let target = extract_dir.join(entry.file_name());
-                    fs::rename(entry.path(), target).await?;
-                }
-                fs::remove_dir(single_dir).await?;
-            }
+    if entry_count == 1
+        && let Some(single_dir) = first_entry
+        && single_dir.is_dir()
+    {
+        let mut entries = fs::read_dir(&single_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let target = extract_dir.join(entry.file_name());
+            fs::rename(entry.path(), target).await?;
         }
+        fs::remove_dir(single_dir).await?;
     }
 
     Ok(())

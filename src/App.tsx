@@ -34,6 +34,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("home");
+  const [hasNewVersions, setHasNewVersions] = useState(false);
 
   async function fetchReleases(forceRefresh = false) {
     setLoading(true);
@@ -70,6 +71,7 @@ function App() {
             error={error}
             fromCache={fromCache}
             onRefresh={fetchReleases}
+            onNewVersionsChange={setHasNewVersions}
           />
         );
       case "notes":
@@ -83,7 +85,7 @@ function App() {
     <div className="app-layout">
       <Sidebar />
       <div className="main-content">
-        <Tabs activeTab={activeTab} onChange={setActiveTab} />
+        <Tabs activeTab={activeTab} onChange={setActiveTab} hasNewVersions={hasNewVersions} />
         <div className="page-container" role="main">
           {renderPage()}
         </div>

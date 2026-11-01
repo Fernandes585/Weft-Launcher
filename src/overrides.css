@@ -149,6 +149,41 @@ html, body, #root {
   }
 }
 
+/* NEW badge on version cards */
+.version-entry .version-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.version-entry .new-badge {
+  font-family: var(--font-pixel);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #0f1a12;
+  background: var(--success);
+  border: 2px solid var(--success);
+  padding: 0.1rem 0.4rem;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Green dot on Versions tab when new versions exist */
+.tab-btn {
+  position: relative;
+}
+.tab-btn .new-dot {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  background: var(--success);
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 * {
   -webkit-user-select: none;
   user-select: none;

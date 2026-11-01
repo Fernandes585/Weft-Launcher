@@ -6,9 +6,10 @@ type TabId = "home" | "versions" | "notes";
 interface TabsProps {
   activeTab: TabId;
   onChange: (tab: TabId) => void;
+  hasNewVersions: boolean;
 }
 
-export function Tabs({ activeTab, onChange }: TabsProps) {
+export function Tabs({ activeTab, onChange, hasNewVersions }: TabsProps) {
   const { t } = useI18n();
 
   const tabs: { id: TabId; label: string }[] = [
@@ -30,6 +31,7 @@ export function Tabs({ activeTab, onChange }: TabsProps) {
           onClick={() => onChange(tab.id)}
         >
           {tab.label}
+          {tab.id === "versions" && hasNewVersions && <span className="new-dot" aria-label="New versions available" />}
         </button>
       ))}
       <LanguageMenu />

@@ -157,7 +157,6 @@ useEffect(() => {
   if (installedVersion) {
     return (
       <div className="version-actions installed">
-        <span className="installed-badge">{t("installedBadge")}</span>
         <button
           className="play-btn"
           onClick={handleLaunch}

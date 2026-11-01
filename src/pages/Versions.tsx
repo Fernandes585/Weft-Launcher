@@ -2,6 +2,8 @@ import { useI18n } from "../i18n/useI18n";
 import { useInstall } from "../hooks/useInstall";
 import { VersionActions } from "../components/VersionActions";
 import { translateError } from "../i18n/errors";
+import { getLocale } from "../i18n";
+import { isNewRelease } from "../utils/version";
 
 interface Release {
   tag: string;
@@ -24,6 +26,7 @@ interface VersionsPageProps {
   error: string | null;
   fromCache: boolean;
   onRefresh: (forceRefresh?: boolean) => void;
+  onNewVersionsChange?: (hasNew: boolean) => void;
 }
 
 export function VersionsPage({
@@ -32,11 +35,24 @@ export function VersionsPage({
   error,
   fromCache,
   onRefresh,
+  onNewVersionsChange,
 }: VersionsPageProps) {
-  const { t, formatSize: fmtSize, locale } = useI18n();
+  const { t, formatSize: fmtSize } = useI18n();
   const { installedVersions, refreshInstalled } = useInstall();
 
   const installedMap = new Map(installedVersions.map((v) => [v.tag, v]));
+
+  // Compute if there are any new versions
+  const hasNewVersions = releases.some((r) =>
+    isNewRelease(r.tag, installedVersions, installedMap)
+  );
+
+  // Notify parent about new versions state change
+  // We use a simple approach: call onNewVersionsChange on every render
+  // The parent can use useEffect to track changes if needed
+  if (onNewVersionsChange) {
+    onNewVersionsChange(hasNewVersions);
+  }
 
   const sortedReleases = [...releases].sort((a, b) =>
     new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
@@ -68,23 +84,25 @@ export function VersionsPage({
           {sortedReleases.map((release) => {
             const installedVersion = installedMap.get(release.tag) ?? null;
             const asset = release.asset;
+            const isNew = isNewRelease(release.tag, installedVersions, installedMap);
 
             return (
               <article
                 key={release.tag}
-                className={`version-entry${installedVersion ? " in-use" : ""}`}
+                className={`version-entry${installedVersion ? " in-use" : ""}${isNew ? " is-new" : ""}`}
                 role="listitem"
               >
                 <div className="version-header">
                   <div className="version-main">
                     <span className="version-tag">{release.tag}</span>
+                    {isNew && <span className="new-badge">{t("newBadge")}</span>}
                     {release.prerelease && (
                       <span className="prerelease-badge">{t("prereleaseBadge")}</span>
                     )}
                   </div>
                   <div className="version-meta">
                     <span className="version-date">
-                      {t("publishedDate")} {new Date(release.published_at).toLocaleDateString(locale)}
+                      {t("publishedDate")} {new Date(release.published_at).toLocaleDateString(getLocale())}
                     </span>
                     <span className="version-size">
                       {t("sizeLabel")} {fmtSize(asset.size)}
