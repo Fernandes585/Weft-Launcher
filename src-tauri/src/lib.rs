@@ -1,5 +1,6 @@
 pub mod config;
 pub mod install;
+pub mod launch;
 pub mod releases;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -17,7 +18,9 @@ pub fn run() {
             releases::list_versions,
             install::install_version,
             install::get_installed_versions,
-            install::remove_version
+            install::remove_version,
+            launch::launch_version,
+            launch::get_running_versions
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

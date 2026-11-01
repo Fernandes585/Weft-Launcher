@@ -10,6 +10,9 @@ use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use zip::result::ZipError;
 
+// Import from launch module to check running versions
+use crate::launch::is_version_running;
+
 const USER_AGENT_VALUE: &str = "weft-launcher/0.1.0";
 
 #[derive(Debug, Error)]
@@ -46,6 +49,10 @@ pub enum InstallError {
     DownloadFailed(String),
     #[error("Falha na extração: {0}")]
     ExtractFailed(String),
+    #[error("Versão está em execução: {0}")]
+    GameRunning(String),
+    #[error("Versão em uso (arquivo bloqueado): {0}")]
+    VersionInUse(String),
 }
 
 impl From<InstallError> for String {
@@ -604,8 +611,33 @@ pub async fn remove_version(app_handle: tauri::AppHandle, tag: String) -> Result
         return Err(InstallError::NotInstalled(tag).to_string());
     }
 
-    fs::remove_dir_all(&version_dir)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    // Check if version is currently running
+    if is_version_running(&app_handle, &tag).await {
+        return Err(InstallError::GameRunning(tag).to_string());
+    }
+
+    // Try to rename the folder first (atomic on Windows, fails if file in use)
+    let removing_dir = versions_dir.join(format!(".removing-{}", tag));
+    match fs::rename(&version_dir, &removing_dir).await {
+        Ok(_) => {
+            // Rename succeeded, now delete the renamed folder
+            fs::remove_dir_all(&removing_dir)
+                .await
+                .map_err(|e| InstallError::Io(e).to_string())?;
+            Ok(())
+        }
+        Err(e) => {
+            // Rename failed - likely file in use on Windows
+            // Check if it's a "file in use" type error
+            if e.kind() == std::io::ErrorKind::PermissionDenied
+                || e.raw_os_error() == Some(32) // ERROR_SHARING_VIOLATION on Windows
+                || e.raw_os_error() == Some(26)
+            // ETXTBSY on Unix
+            {
+                Err(InstallError::VersionInUse(tag).to_string())
+            } else {
+                Err(InstallError::Io(e).to_string())
+            }
+        }
+    }
 }

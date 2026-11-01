@@ -25,6 +25,8 @@ interface I18nMessages {
   deleteForReal: string;
   confirmDelete: string;
   deleteTitle: string;
+  playButton: string;
+  playing: string;
   progressDownloading: string;
   progressVerifying: string;
   progressExtracting: string;
@@ -35,6 +37,12 @@ interface I18nMessages {
   errorExtractFailed: string;
   errorAlreadyInstalled: string;
   errorNotInstalled: string;
+  errorAlreadyRunning: string;
+  errorExecutableNotFound: string;
+  errorGameRunning: string;
+  errorVersionInUse: string;
+  deleteDisabledTooltip: string;
+  playDisabledTooltip: string;
   errors: {
     network: string;
     io: string;

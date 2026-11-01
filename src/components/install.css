@@ -39,7 +39,8 @@
 }
 
 .install-btn,
-.delete-btn {
+.delete-btn,
+.play-btn {
   padding: 0.4rem 0.85rem;
   font-size: 0.85rem;
   font-weight: 500;
@@ -60,6 +61,19 @@
 }
 
 .install-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.play-btn {
+  background-color: #2e7d32;
+  color: white;
+}
+
+.play-btn:hover:not(:disabled) {
+  background-color: #256629;
+}
+
+.play-btn:active:not(:disabled) {
   transform: scale(0.98);
 }
 
