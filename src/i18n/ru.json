@@ -58,6 +58,7 @@
   "openFolderButton": "Открыть папку",
   "gameClosedError": "Игра закрылась с ошибкой (код {0})",
   "openLogButton": "Открыть лог",
+  "noCompatibleVersions": "Нет доступных версий Weft для вашей системы.",
   "heroBadge": "ВЕРСИЯ {0} · ГОТОВО",
   "errors": {
     "network": "Ошибка сети: {0}",
@@ -87,7 +88,8 @@
     "logDirCreateFailed": "Не удалось создать директорию для логов: {0}",
     "gameFolderNotFound": "Папка игры не найдена: {0}",
     "unsupportedPlatform": "Расположение папки игры не подтверждено на этой платформе",
-    "openerError": "Не удалось открыть: {0}"
+    "openerError": "Не удалось открыть: {0}",
+    "noCompatibleVersions": "Нет доступных версий Weft для вашей системы."
   },
   "sizeUnits": { "B": "Б", "KB": "КБ", "MB": "МБ", "GB": "ГБ" }
 }

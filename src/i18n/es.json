@@ -58,6 +58,7 @@
   "openFolderButton": "Abrir carpeta",
   "gameClosedError": "El juego se cerró con error (código {0})",
   "openLogButton": "Abrir registro",
+  "noCompatibleVersions": "Ninguna versión de Weft disponible para tu sistema.",
   "heroBadge": "VERSIÓN {0} · LISTO",
   "errors": {
     "network": "Error de red: {0}",
@@ -87,7 +88,8 @@
     "logDirCreateFailed": "Error al crear directorio de logs: {0}",
     "gameFolderNotFound": "Carpeta del juego no encontrada: {0}",
     "unsupportedPlatform": "Ubicación de la carpeta del juego no confirmada en esta plataforma",
-    "openerError": "Error al abrir: {0}"
+    "openerError": "Error al abrir: {0}",
+    "noCompatibleVersions": "Ninguna versión de Weft disponible para tu sistema."
   },
   "sizeUnits": { "B": "B", "KB": "KB", "MB": "MB", "GB": "GB" }
 }

@@ -40,6 +40,7 @@ impl From<crate::releases::ReleasesError> for AppError {
             RateLimited => AppError::new("RateLimited", None),
             Forbidden => AppError::new("Forbidden", None),
             OfflineNoCache => AppError::new("OfflineNoCache", None),
+            NoCompatibleVersions => AppError::new("NoCompatibleVersions", None),
         }
     }
 }

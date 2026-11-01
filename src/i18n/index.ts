@@ -61,6 +61,7 @@ updateCloseGame: string;
   openFolderButton: string;
   gameClosedError: string;
   openLogButton: string;
+  noCompatibleVersions: string;
   errors: {
     network: string;
     io: string;
@@ -90,6 +91,7 @@ updateCloseGame: string;
     gameFolderNotFound: string;
     unsupportedPlatform: string;
     openerError: string;
+    noCompatibleVersions: string;
   };
   sizeUnits: {
     B: string;

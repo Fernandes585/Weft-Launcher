@@ -35,6 +35,8 @@ pub enum ReleasesError {
     Forbidden,
     #[error("Sem conexão e sem cache disponível")]
     OfflineNoCache,
+    #[error("Nenhuma versão do Weft disponível para o seu sistema")]
+    NoCompatibleVersions,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,12 +118,47 @@ fn current_platform_asset_suffix() -> &'static str {
     )))]
     return "";
 }
-fn select_asset_for_platform(assets: &[GitHubAsset]) -> Result<AssetInfo, ReleasesError> {
-    let suffix = current_platform_asset_suffix();
-    if suffix.is_empty() {
-        return Err(ReleasesError::AssetNotFound);
-    }
 
+/// Pure function: returns the asset suffix for a given OS and architecture.
+/// This is separated to enable unit testing without depending on compile-time cfg.
+#[allow(dead_code)]
+fn asset_suffix(os: &str, arch: &str) -> Option<&'static str> {
+    match (os, arch) {
+        ("windows", "x86_64") => Some("windows-x64.zip"),
+        ("linux", "x86_64") => Some("linux-x64.tar.gz"),
+        ("macos", "aarch64") => Some("macos-arm64.tar.gz"),
+        _ => None,
+    }
+}
+
+/// Pure function: filters releases to keep only those with an asset matching the suffix.
+/// Returns the filtered list and a flag indicating if any compatible release was found.
+fn filter_releases(
+    releases: Vec<GitHubRelease>,
+    suffix: &str,
+) -> (Vec<Release>, bool) {
+    let mut filtered = Vec::new();
+    for gh in releases {
+        if gh.prerelease {
+            continue;
+        }
+        if let Some(asset) = find_matching_asset(&gh.assets, suffix) {
+            filtered.push(Release {
+                tag: gh.tag_name,
+                name: gh.name,
+                published_at: gh.published_at,
+                body: gh.body.unwrap_or_default(),
+                prerelease: gh.prerelease,
+                asset,
+                from_cache: false,
+            });
+        }
+    }
+    let has_compatible = !filtered.is_empty();
+    (filtered, has_compatible)
+}
+
+fn find_matching_asset(assets: &[GitHubAsset], suffix: &str) -> Option<AssetInfo> {
     for asset in assets {
         if asset.name.contains("Source code") || asset.name.contains("source code") {
             continue;
@@ -132,7 +169,7 @@ fn select_asset_for_platform(assets: &[GitHubAsset]) -> Result<AssetInfo, Releas
                 .as_ref()
                 .and_then(|d| d.strip_prefix("sha256:"))
                 .map(|s| s.to_string());
-            return Ok(AssetInfo {
+            return Some(AssetInfo {
                 name: asset.name.clone(),
                 url: asset.browser_download_url.clone(),
                 size: asset.size,
@@ -140,26 +177,31 @@ fn select_asset_for_platform(assets: &[GitHubAsset]) -> Result<AssetInfo, Releas
             });
         }
     }
-    Err(ReleasesError::AssetNotFound)
+    None
+}
+
+#[allow(dead_code)]
+fn select_asset_for_platform(assets: &[GitHubAsset]) -> Result<AssetInfo, ReleasesError> {
+    let suffix = current_platform_asset_suffix();
+    if suffix.is_empty() {
+        return Err(ReleasesError::AssetNotFound);
+    }
+
+    find_matching_asset(assets, suffix).ok_or(ReleasesError::AssetNotFound)
 }
 
 fn parse_github_releases(gh_releases: Vec<GitHubRelease>) -> Result<Vec<Release>, ReleasesError> {
-    let mut releases = Vec::new();
-    for gh in gh_releases {
-        if gh.prerelease {
-            continue;
-        }
-        let asset = select_asset_for_platform(&gh.assets)?;
-        releases.push(Release {
-            tag: gh.tag_name,
-            name: gh.name,
-            published_at: gh.published_at,
-            body: gh.body.unwrap_or_default(),
-            prerelease: gh.prerelease,
-            asset,
-            from_cache: false,
-        });
+    let suffix = current_platform_asset_suffix();
+    if suffix.is_empty() {
+        return Err(ReleasesError::AssetNotFound);
     }
+
+    let (releases, has_compatible) = filter_releases(gh_releases, suffix);
+    
+    if !has_compatible {
+        return Err(ReleasesError::NoCompatibleVersions);
+    }
+    
     Ok(releases)
 }
 
@@ -299,5 +341,112 @@ pub async fn list_versions(
                 Err(e.into())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_gh_release(tag: &str, asset_names: Vec<&str>) -> GitHubRelease {
+        GitHubRelease {
+            tag_name: tag.to_string(),
+            name: tag.to_string(),
+            published_at: "2024-01-01T00:00:00Z".to_string(),
+            body: None,
+            prerelease: false,
+            assets: asset_names
+                .into_iter()
+                .map(|name| GitHubAsset {
+                    name: name.to_string(),
+                    browser_download_url: format!("https://example.com/{}", name),
+                    size: 1000,
+                    digest: Some("sha256:abc123".to_string()),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn test_asset_suffix_windows_x64() {
+        assert_eq!(asset_suffix("windows", "x86_64"), Some("windows-x64.zip"));
+    }
+
+    #[test]
+    fn test_asset_suffix_linux_x64() {
+        assert_eq!(asset_suffix("linux", "x86_64"), Some("linux-x64.tar.gz"));
+    }
+
+    #[test]
+    fn test_asset_suffix_macos_arm64() {
+        assert_eq!(asset_suffix("macos", "aarch64"), Some("macos-arm64.tar.gz"));
+    }
+
+    #[test]
+    fn test_asset_suffix_unknown() {
+        assert_eq!(asset_suffix("linux", "arm64"), None);
+        assert_eq!(asset_suffix("windows", "arm64"), None);
+    }
+
+    #[test]
+    fn test_filter_releases_only_windows_asset_linux_suffix() {
+        // Release with only Windows asset, filtering for Linux suffix -> ignored
+        let releases = vec![make_gh_release("v1.0.0", vec!["Weft-v1.0.0-windows-x64.zip"])];
+        let (filtered, has_compatible) = filter_releases(releases, "linux-x64.tar.gz");
+        assert!(!has_compatible);
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_filter_releases_all_three_assets_picks_correct() {
+        // Release with all three assets, filtering for Linux suffix -> picks Linux
+        let releases = vec![make_gh_release(
+            "v1.0.0",
+            vec![
+                "Weft-v1.0.0-windows-x64.zip",
+                "Weft-v1.0.0-linux-x64.tar.gz",
+                "Weft-v1.0.0-macos-arm64.tar.gz",
+            ],
+        )];
+        let (filtered, has_compatible) = filter_releases(releases, "linux-x64.tar.gz");
+        assert!(has_compatible);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].asset.name, "Weft-v1.0.0-linux-x64.tar.gz");
+    }
+
+    #[test]
+    fn test_filter_releases_no_compatible_versions_error() {
+        // Two releases, neither has Linux asset -> empty result, has_compatible = false
+        let releases = vec![
+            make_gh_release("v1.0.0", vec!["Weft-v1.0.0-windows-x64.zip"]),
+            make_gh_release("v2.0.0", vec!["Weft-v2.0.0-windows-x64.zip"]),
+        ];
+        let (filtered, has_compatible) = filter_releases(releases, "linux-x64.tar.gz");
+        assert!(!has_compatible);
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_filter_releases_skips_prerelease() {
+        let mut releases = vec![make_gh_release("v1.0.0", vec!["Weft-v1.0.0-linux-x64.tar.gz"])];
+        releases[0].prerelease = true;
+        let (filtered, has_compatible) = filter_releases(releases, "linux-x64.tar.gz");
+        assert!(!has_compatible);
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_filter_releases_skips_source_code() {
+        let releases = vec![make_gh_release(
+            "v1.0.0",
+            vec![
+                "Source code.zip",
+                "Weft-v1.0.0-linux-x64.tar.gz",
+            ],
+        )];
+        let (filtered, has_compatible) = filter_releases(releases, "linux-x64.tar.gz");
+        assert!(has_compatible);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].asset.name, "Weft-v1.0.0-linux-x64.tar.gz");
     }
 }

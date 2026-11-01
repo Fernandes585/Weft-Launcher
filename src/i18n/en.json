@@ -59,6 +59,7 @@
   "openFolderButton": "Open folder",
   "gameClosedError": "Game closed with error (code {0})",
   "openLogButton": "Open log",
+  "noCompatibleVersions": "No Weft versions available for your system.",
   "errors": {
     "network": "Network error: {0}",
     "io": "I/O error: {0}",
@@ -87,7 +88,8 @@
     "logDirCreateFailed": "Failed to create log directory: {0}",
     "gameFolderNotFound": "Game folder not found: {0}",
     "unsupportedPlatform": "Game folder location not confirmed on this platform",
-    "openerError": "Failed to open: {0}"
+    "openerError": "Failed to open: {0}",
+    "noCompatibleVersions": "No Weft versions available for your system."
   },
   "sizeUnits": {
     "B": "B",

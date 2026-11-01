@@ -59,6 +59,7 @@
   "openFolderButton": "Abrir pasta",
   "gameClosedError": "O jogo fechou com erro (código {0})",
   "openLogButton": "Abrir log",
+  "noCompatibleVersions": "Nenhuma versão do Weft disponível para o seu sistema.",
   "errors": {
     "network": "Erro de rede: {0}",
     "io": "Erro de I/O: {0}",
@@ -87,7 +88,8 @@
     "logDirCreateFailed": "Falha ao criar diretório de logs: {0}",
     "gameFolderNotFound": "Pasta do jogo não encontrada: {0}",
     "unsupportedPlatform": "Localização da pasta do jogo não confirmada nesta plataforma",
-    "openerError": "Falha ao abrir: {0}"
+    "openerError": "Falha ao abrir: {0}",
+    "noCompatibleVersions": "Nenhuma versão do Weft disponível para o seu sistema."
   },
   "sizeUnits": {
     "B": "B",
