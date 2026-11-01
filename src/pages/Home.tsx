@@ -5,6 +5,19 @@ import { useInstall } from "../hooks/useInstall";
 import { useGameState } from "../hooks/useGameState";
 import { PixelBanner } from "../components/PixelBanner";
 
+const parseTag = (s: string) =>
+  s.replace(/^v/i, "").split(/[.\-]/).map((n) => parseInt(n, 10) || 0);
+
+function compareTags(a: string, b: string) {
+  const x = parseTag(a);
+  const y = parseTag(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
 export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
   const { t } = useI18n();
   const { installedVersions } = useInstall();
@@ -13,10 +26,17 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [launchError, setLaunchError] = useState<string | null>(null);
 
+  const sortedVersions = useMemo(
+  () => [...installedVersions].sort((a, b) => compareTags(b.tag, a.tag)),
+  [installedVersions]
+);
+
+  const effectiveTag = selectedTag ?? sortedVersions[0]?.tag ?? null;
+
   const selectedVersion = useMemo(
-    () => installedVersions.find((v) => v.tag === selectedTag) ?? null,
-    [installedVersions, selectedTag]
-  );
+  () => sortedVersions.find((v) => v.tag === effectiveTag) ?? null,
+  [sortedVersions, effectiveTag]
+);
 
   const handleLaunch = async (tag: string) => {
     setLaunchError(null);
@@ -38,7 +58,7 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
     }
   };
 
-  const isSelectedRunning = selectedTag ? isRunning(selectedTag) : false;
+  const isSelectedRunning = effectiveTag ? isRunning(effectiveTag) : false;
   const playDisabled = anyRunning || isSelectedRunning;
 
   if (installedVersions.length === 0) {
@@ -63,7 +83,7 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
         <div className="hero-header">
           <h1 className="hero-title">Weft</h1>
           <div className="hero-version-badge">
-            {t("heroBadge", selectedTag || installedVersions[0]?.tag || "—")}
+            {t("heroBadge", effectiveTag || "—")}
           </div>
         </div>
         <div className="hero-play-area">
@@ -73,24 +93,23 @@ export function Home({ onGoToVersions }: { onGoToVersions: () => void }) {
             </label>
             <select
               id="version-select"
-              value={selectedTag || ""}
+              value={effectiveTag || ""}
               onChange={(e) => setSelectedTag(e.target.value || null)}
               disabled={anyRunning}
             >
-              <option value="">{t("selectVersionPlaceholder")}</option>
-              {installedVersions.map((v) => (
-                <option key={v.tag} value={v.tag}>
-                  {v.tag}
-                </option>
-              ))}
+              {sortedVersions.map((v, i) => (
+              <option key={v.tag} value={v.tag}>
+              {i === 0 ? `${v.tag} — ${t("latestBadge")}` : v.tag}
+              </option>
+             ))}
             </select>
           </div>
           <button
-            className="btn-play"
-            onClick={() => selectedTag && handleLaunch(selectedTag)}
-            disabled={!selectedTag || playDisabled}
-            aria-label={isSelectedRunning ? t("playing") : t("playButton")}
-          >
+              className="btn-play"
+              onClick={() => effectiveTag && handleLaunch(effectiveTag)}
+              disabled={!effectiveTag || playDisabled}
+              aria-label={isSelectedRunning ? t("playing") : t("playButton")}
+            >
             {isSelectedRunning ? t("playing") : t("playButton")}
           </button>
         </div>

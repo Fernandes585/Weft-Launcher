@@ -1,5 +1,6 @@
 {
   "appTitle": "Weft Launcher",
+  "latestBadge": "Последняя",
   "refreshButton": "Обновить список",
   "loading": "Загрузка...",
   "cacheBanner": "⚠ Показан кэш (нет сети или нет обновлений)",

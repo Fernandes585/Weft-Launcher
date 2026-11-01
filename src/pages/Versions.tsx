@@ -33,7 +33,7 @@ export function VersionsPage({
   onRefresh,
 }: VersionsPageProps) {
   const { t, formatSize: fmtSize } = useI18n();
-  const { installedVersions } = useInstall();
+  const { installedVersions, refreshInstalled } = useInstall();
 
   const installedMap = new Map(installedVersions.map((v) => [v.tag, v]));
 
@@ -80,9 +80,6 @@ export function VersionsPage({
                     {release.prerelease && (
                       <span className="prerelease-badge">{t("prereleaseBadge")}</span>
                     )}
-                    {installedVersion && (
-                      <span className="installed-badge">{t("installedBadge")}</span>
-                    )}
                   </div>
                   <div className="version-meta">
                     <span className="version-date">
@@ -110,6 +107,7 @@ export function VersionsPage({
                     },
                   }}
                   installedVersion={installedVersion}
+                  onInstallComplete={refreshInstalled}
                 />
               </article>
             );

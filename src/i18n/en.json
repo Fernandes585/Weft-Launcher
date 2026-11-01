@@ -1,5 +1,6 @@
 {
   "heroBadge": "VERSION {0} · READY",
+  "latestBadge": "Latest",
   "appTitle": "Weft Launcher",
   "refreshButton": "Refresh list",
   "loading": "Loading...",
