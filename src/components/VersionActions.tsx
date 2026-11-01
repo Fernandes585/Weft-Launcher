@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useInstall, InstalledVersion, InstallProgress } from "../hooks/useInstall";
 import { useGameState } from "../hooks/useGameState";
 import { t } from "../i18n";
+import { listen } from "@tauri-apps/api/event";
 
 interface VersionActionsProps {
   release: {
@@ -59,7 +60,6 @@ export function VersionActions({
     return err;
   }, [release.tag]);
 
-  // Auto-revert confirm state after 4 seconds
   useEffect(() => {
     if (confirmDelete) {
       const timer = setTimeout(() => {
@@ -68,6 +68,24 @@ export function VersionActions({
       return () => clearTimeout(timer);
     }
   }, [confirmDelete]);
+
+useEffect(() => {
+  let unlisten: (() => void) | undefined;
+  let cancelled = false;
+
+  listen<InstallProgress>("install-progress", (event) => {
+    if (event.payload.tag !== release.tag) return;
+    setLocalProgress(event.payload);
+  }).then((fn) => {
+    if (cancelled) fn();
+    else unlisten = fn;
+  });
+
+  return () => {
+    cancelled = true;
+    unlisten?.();
+  };
+}, [release.tag]);
 
   const handleInstall = async () => {
     if (!release.asset.sha256) {

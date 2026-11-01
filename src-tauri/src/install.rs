@@ -163,6 +163,9 @@ pub async fn install_version(
     let mut last_reported_bytes = 0u64;
     let mut last_report_time = std::time::Instant::now();
 
+    #[cfg(debug_assertions)]
+    let download_start = std::time::Instant::now();
+
     let mut file = match fs::File::create(&temp_download).await {
         Ok(f) => f,
         Err(e) => {
@@ -230,6 +233,23 @@ pub async fn install_version(
             };
             last_reported_bytes = downloaded;
             last_report_time = now;
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            if let Ok(val) = std::env::var("WEFT_THROTTLE_KBPS") {
+                if let Ok(kbps) = val.parse::<f64>() {
+                    if kbps > 0.0 {
+                        let bytes_per_sec = kbps * 1024.0;
+                        let expected_duration = downloaded as f64 / bytes_per_sec;
+                        let actual_duration = download_start.elapsed().as_secs_f64();
+                        if expected_duration > actual_duration {
+                            let sleep_secs = expected_duration - actual_duration;
+                            tokio::time::sleep(std::time::Duration::from_secs_f64(sleep_secs)).await;
+                        }
+                    }
+                }
+            }
         }
     }
 
