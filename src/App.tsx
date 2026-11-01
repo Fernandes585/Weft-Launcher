@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "./i18n/useI18n";
-import { useInstall, InstalledVersion } from "./hooks/useInstall";
-import { VersionActions } from "./components/VersionActions";
+import { Sidebar } from "./components/Sidebar";
+import { Tabs } from "./components/Tabs";
+import { Home } from "./pages/Home";
+import { VersionsPage } from "./pages/Versions";
+import { NotesPage } from "./pages/Notes";
 import "./App.css";
-import "./components/install.css";
 
 interface AssetInfo {
   name: string;
@@ -23,31 +25,15 @@ interface Release {
   from_cache: boolean;
 }
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+type TabId = "home" | "versions" | "notes";
 
 function App() {
-  const { t, formatSize, ready } = useI18n();
-  const { installedVersions, refreshInstalled } = useInstall();
+  const { t, ready } = useI18n();
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fromCache, setFromCache] = useState(false);
-
-  const getInstalledVersion = useCallback(
-    (tag: string): InstalledVersion | null => {
-      return installedVersions.find((v) => v.tag === tag) ?? null;
-    },
-    [installedVersions]
-  );
+  const [activeTab, setActiveTab] = useState<TabId>("home");
 
   async function fetchReleases(forceRefresh = false) {
     setLoading(true);
@@ -57,7 +43,6 @@ function App() {
       setReleases(data);
       setFromCache(data.some((r) => r.from_cache));
     } catch (err) {
-      // Translate error if it matches known error codes
       const errorStr = err as string;
       setError(errorStr);
     } finally {
@@ -73,66 +58,37 @@ function App() {
     return <div className="loading-screen">{t('loading')}</div>;
   }
 
+  const renderPage = () => {
+    switch (activeTab) {
+      case "home":
+        return <Home onGoToVersions={() => setActiveTab("versions")} />;
+      case "versions":
+        return (
+          <VersionsPage
+            releases={releases}
+            loading={loading}
+            error={error}
+            fromCache={fromCache}
+            onRefresh={fetchReleases}
+          />
+        );
+      case "notes":
+        return <NotesPage releases={releases} />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <main className="container">
-      <header className="header">
-        <h1>{t('appTitle')}</h1>
-        <button className="refresh-btn" onClick={() => fetchReleases(true)} disabled={loading}>
-          {loading ? t('loading') : t('refreshButton')}
-        </button>
-      </header>
-
-      {fromCache && (
-        <div className="cache-banner">
-          {t('cacheBanner')}
+    <div className="app-layout">
+      <Sidebar />
+      <div className="main-content">
+        <Tabs activeTab={activeTab} onChange={setActiveTab} />
+        <div className="page-container" role="main">
+          {renderPage()}
         </div>
-      )}
-
-      {error && (
-        <div className="error-container">
-          <div className="error">{t('errorPrefix')}{error}</div>
-          <button className="refresh-btn" onClick={() => fetchReleases(true)} disabled={loading}>
-            {t('refreshButton')}
-          </button>
-        </div>
-      )}
-
-      {!error && (
-        <ul className="versions-list">
-          {releases.map((release) => (
-            <li key={release.tag} className="version-item">
-              <div className="version-header">
-                <span className="version-tag">{release.tag}</span>
-                <span className="version-name">{release.name}</span>
-                {release.prerelease && <span className="prerelease-badge">{t('prereleaseBadge')}</span>}
-              </div>
-              <div className="version-meta">
-                <span>📅 {formatDate(release.published_at)}</span>
-                <span>📦 {release.asset.name} ({formatSize(release.asset.size)})</span>
-                {release.asset.sha256 && (
-                  <span>🔐 SHA256: {release.asset.sha256.slice(0, 16)}...</span>
-                )}
-              </div>
-              {release.body && (
-                <details className="changelog">
-                  <summary>{t('changelogSummary')}</summary>
-                  <pre>{release.body}</pre>
-                </details>
-              )}
-              <VersionActions
-                release={release}
-                installedVersion={getInstalledVersion(release.tag)}
-                onInstallComplete={refreshInstalled}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {!error && releases.length === 0 && !loading && (
-        <p className="empty-state">{t('emptyState')}</p>
-      )}
-    </main>
+      </div>
+    </div>
   );
 }
 
