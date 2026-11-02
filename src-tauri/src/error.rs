@@ -16,7 +16,7 @@ impl AppError {
 
 impl From<std::io::Error> for AppError {
     fn from(err: std::io::Error) -> Self {
-        AppError::new("Io", Some(err.to_string()))
+        AppError::new("io", Some(err.to_string()))
     }
 }
 
@@ -30,17 +30,17 @@ impl From<crate::releases::ReleasesError> for AppError {
     fn from(err: crate::releases::ReleasesError) -> Self {
         use crate::releases::ReleasesError::*;
         match err {
-            Network(e) => AppError::new("Network", Some(e.to_string())),
-            Io(e) => AppError::new("Io", Some(e.to_string())),
-            Serde(e) => AppError::new("Serde", Some(e.to_string())),
-            InvalidHeader(e) => AppError::new("InvalidHeader", Some(e.to_string())),
-            CacheCorrupted(msg) => AppError::new("CacheCorrupted", Some(msg)),
-            AssetNotFound => AppError::new("AssetNotFound", None),
-            MissingDigest => AppError::new("MissingDigest", None),
-            RateLimited => AppError::new("RateLimited", None),
-            Forbidden => AppError::new("Forbidden", None),
-            OfflineNoCache => AppError::new("OfflineNoCache", None),
-            NoCompatibleVersions => AppError::new("NoCompatibleVersions", None),
+            Network(e) => AppError::new("network", Some(e.to_string())),
+            Io(e) => AppError::new("io", Some(e.to_string())),
+            Serde(e) => AppError::new("serialization", Some(e.to_string())),
+            InvalidHeader(e) => AppError::new("httpHeader", Some(e.to_string())),
+            CacheCorrupted(msg) => AppError::new("cacheCorrupted", Some(msg)),
+            AssetNotFound => AppError::new("assetNotFound", None),
+            MissingDigest => AppError::new("missingDigest", None),
+            RateLimited => AppError::new("rateLimited", None),
+            Forbidden => AppError::new("forbidden", None),
+            OfflineNoCache => AppError::new("offlineNoCache", None),
+            NoCompatibleVersions => AppError::new("noCompatibleVersions", None),
         }
     }
 }
@@ -49,27 +49,27 @@ impl From<crate::install::InstallError> for AppError {
     fn from(err: crate::install::InstallError) -> Self {
         use crate::install::InstallError::*;
         match err {
-            Network(e) => AppError::new("Network", Some(e.to_string())),
-            Io(e) => AppError::new("Io", Some(e.to_string())),
-            Serde(e) => AppError::new("Serde", Some(e.to_string())),
-            Zip(e) => AppError::new("Zip", Some(e.to_string())),
-            CreateDir(msg) => AppError::new("CreateDir", Some(msg)),
+            Network(e) => AppError::new("network", Some(e.to_string())),
+            Io(e) => AppError::new("io", Some(e.to_string())),
+            Serde(e) => AppError::new("serialization", Some(e.to_string())),
+            Zip(e) => AppError::new("zip", Some(e.to_string())),
+            CreateDir(msg) => AppError::new("createDir", Some(msg)),
             Sha256Mismatch { expected, actual } => AppError::new(
-                "Sha256Mismatch",
+                "sha256Mismatch",
                 Some(format!("esperado {}, obtido {}", expected, actual)),
             ),
-            MissingDigest => AppError::new("MissingDigest", None),
-            HashMissing => AppError::new("HashMissing", None),
-            AssetNotFound => AppError::new("AssetNotFound", None),
-            AlreadyInstalled(tag) => AppError::new("AlreadyInstalled", Some(tag)),
-            NotInstalled(tag) => AppError::new("NotInstalled", Some(tag)),
-            RateLimited => AppError::new("RateLimited", None),
-            Forbidden => AppError::new("Forbidden", None),
-            OfflineNoCache => AppError::new("OfflineNoCache", None),
-            DownloadFailed(msg) => AppError::new("DownloadFailed", Some(msg)),
-            ExtractFailed(msg) => AppError::new("ExtractFailed", Some(msg)),
-            GameRunning(tag) => AppError::new("GameRunning", Some(tag)),
-            VersionInUse(tag) => AppError::new("VersionInUse", Some(tag)),
+            MissingDigest => AppError::new("missingDigest", None),
+            HashMissing => AppError::new("hashMissing", None),
+            AssetNotFound => AppError::new("assetNotFound", None),
+            AlreadyInstalled(tag) => AppError::new("alreadyInstalled", Some(tag)),
+            NotInstalled(tag) => AppError::new("notInstalled", Some(tag)),
+            RateLimited => AppError::new("rateLimited", None),
+            Forbidden => AppError::new("forbidden", None),
+            OfflineNoCache => AppError::new("offlineNoCache", None),
+            DownloadFailed(msg) => AppError::new("downloadFailed", Some(msg)),
+            ExtractFailed(msg) => AppError::new("extractFailed", Some(msg)),
+            GameRunning(tag) => AppError::new("gameRunning", Some(tag)),
+            VersionInUse(tag) => AppError::new("versionInUse", Some(tag)),
         }
     }
 }
@@ -78,16 +78,16 @@ impl From<crate::launch::LaunchError> for AppError {
     fn from(err: crate::launch::LaunchError) -> Self {
         use crate::launch::LaunchError::*;
         match err {
-            Io(e) => AppError::new("Io", Some(e.to_string())),
-            AlreadyRunning(tag) => AppError::new("AlreadyRunning", Some(tag)),
-            AnotherGameRunning(tag) => AppError::new("AnotherGameRunning", Some(tag)),
+            Io(e) => AppError::new("io", Some(e.to_string())),
+            AlreadyRunning(tag) => AppError::new("alreadyRunning", Some(tag)),
+            AnotherGameRunning(tag) => AppError::new("anotherGameRunning", Some(tag)),
             ExecutableNotFound(path_or_tag) => {
-                AppError::new("ExecutableNotFound", Some(path_or_tag))
+                AppError::new("executableNotFound", Some(path_or_tag))
             }
-            ProcessSpawnFailed(msg) => AppError::new("ProcessSpawnFailed", Some(msg)),
-            LogDirCreateFailed(msg) => AppError::new("LogDirCreateFailed", Some(msg)),
-            GameFolderNotFound(msg) => AppError::new("GameFolderNotFound", Some(msg)),
-            OpenerError(e) => AppError::new("OpenerError", Some(e.to_string())),
+            ProcessSpawnFailed(msg) => AppError::new("processSpawnFailed", Some(msg)),
+            LogDirCreateFailed(msg) => AppError::new("logDirCreateFailed", Some(msg)),
+            GameFolderNotFound(msg) => AppError::new("gameFolderNotFound", Some(msg)),
+            OpenerError(e) => AppError::new("openerError", Some(e.to_string())),
         }
     }
 }

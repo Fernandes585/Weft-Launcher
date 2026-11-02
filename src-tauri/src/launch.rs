@@ -10,6 +10,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command as TokioCommand;
 use tokio::sync::mpsc;
 use crate::error::AppError;
+use crate::install::executable_name;
 
 #[derive(Debug, Error)]
 pub enum LaunchError {
@@ -175,11 +176,7 @@ fn get_logs_dir(app_handle: &AppHandle) -> Result<PathBuf, LaunchError> {
 pub async fn launch_version(app_handle: AppHandle, tag: String) -> Result<(), AppError> {
     let versions_dir = get_versions_dir(&app_handle)?;
     let version_dir = versions_dir.join(&tag);
-    let executable_name = if cfg!(target_os = "windows") {
-        "weft.exe"
-    } else {
-        "weft"
-    };
+    let executable_name = executable_name();
     let executable = version_dir.join(executable_name);
 
     if !executable.exists() {

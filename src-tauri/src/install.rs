@@ -3,6 +3,7 @@ use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::File as StdFile;
+use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
 use tauri::{Emitter, Manager};
 use thiserror::Error;
@@ -16,6 +17,34 @@ use std::os::unix::fs::PermissionsExt;
 // Import from launch module to check running versions
 use crate::launch::is_version_running;
 use crate::error::AppError;
+
+/// Returns the platform-specific executable name for Weft.
+pub fn executable_name() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "weft.exe"
+    } else {
+        "weft"
+    }
+}
+
+/// Logs an error to launcher.log in the app data directory.
+async fn log_error(app_handle: &tauri::AppHandle, stage: &str, err: &std::io::Error) {
+    if let Ok(app_data) = app_handle.path().app_data_dir() {
+        let log_path = app_data.join("launcher.log");
+        let timestamp = time::OffsetDateTime::now_utc()
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_default();
+        let log_entry = format!("[{}] [{}] {}\n", timestamp, stage, err);
+        if let Ok(mut file) = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)
+            .await
+        {
+            let _ = file.write_all(log_entry.as_bytes()).await;
+        }
+    }
+}
 
 const USER_AGENT_VALUE: &str = "weft-launcher/0.1.0";
 
@@ -89,6 +118,23 @@ async fn cleanup_temp(temp_download: PathBuf, temp_extract: PathBuf) {
     fs::remove_dir_all(temp_extract).await.ok();
 }
 
+/// Recursively copies a directory from src to dst.
+async fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), InstallError> {
+    fs::create_dir_all(dst).await?;
+    let mut entries = fs::read_dir(src).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        let file_type = entry.file_type().await?;
+        if file_type.is_dir() {
+            Box::pin(copy_dir_all(&src_path, &dst_path)).await?;
+        } else {
+            fs::copy(&src_path, &dst_path).await?;
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn install_version(
     app_handle: tauri::AppHandle,
@@ -104,11 +150,7 @@ pub async fn install_version(
     fs::create_dir_all(&downloads_dir).await?;
 
     let version_dir = versions_dir.join(&tag);
-    let executable_name = if cfg!(target_os = "windows") {
-        "weft.exe"
-    } else {
-        "weft"
-    };
+    let executable_name = executable_name();
     let executable_path = version_dir.join(executable_name);
 
     // Check if already properly installed (directory exists AND executable exists)
@@ -294,10 +336,16 @@ pub async fn install_version(
         );
     };
 
+    if let Err(e) = &extract_result {
+        log_error(&app_handle, "extracting", &std::io::Error::other(e.to_string())).await;
+    }
     extract_result?;
 
     // Normalize structure (handle top-level folder)
-    normalize_install_structure(&temp_extract, &tag).await?;
+    if let Err(e) = normalize_install_structure(&temp_extract, &tag).await {
+        log_error(&app_handle, "normalizing", &std::io::Error::other(e.to_string())).await;
+        return Err(e.into());
+    }
 
     // Verify executable exists in temp directory before finalizing
     let temp_executable = temp_extract.join(executable_name);
@@ -334,6 +382,7 @@ pub async fn install_version(
         let mut perms = fs::metadata(&temp_executable).await?.permissions();
         perms.set_mode(0o755);
         if let Err(e) = fs::set_permissions(&temp_executable, perms).await {
+            log_error(&app_handle, "setting permissions", &e).await;
             cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
             return Err(InstallError::ExtractFailed(format!(
                 "Falha ao definir permissão de execução: {}",
@@ -356,14 +405,51 @@ pub async fn install_version(
         }),
     );
 
-    // Atomic rename
+    // Atomic rename with EXDEV fallback (copy + delete)
     if version_dir.exists() {
         fs::remove_dir_all(&version_dir).await?;
     }
-    fs::rename(&temp_extract, &version_dir).await?;
+    if let Err(e) = fs::rename(&temp_extract, &version_dir).await {
+        // If rename fails due to cross-device (EXDEV), fallback to copy + delete
+        if e.kind() == ErrorKind::CrossesDevices {
+            // Copy recursively
+            copy_dir_all(&temp_extract, &version_dir).await?;
+            // Remove temp dir
+            fs::remove_dir_all(&temp_extract).await?;
+        } else {
+            log_error(&app_handle, "finalizing (rename)", &e).await;
+            cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
+            return Err(e.into());
+        }
+    }
 
     // Clean up temp download
     fs::remove_file(&temp_download).await.ok();
+
+    // Final verification: executable exists and is executable (on Unix)
+    let final_executable = version_dir.join(executable_name);
+    if !final_executable.exists() {
+        fs::remove_dir_all(&version_dir).await.ok();
+        return Err(
+            InstallError::ExtractFailed("Executável não encontrado após finalização".to_string())
+                .into(),
+        );
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let metadata = fs::metadata(&final_executable).await?;
+        // Check if executable bit is set (any of user/group/other)
+        if metadata.mode() & 0o111 == 0 {
+            fs::remove_dir_all(&version_dir).await.ok();
+            return Err(
+                InstallError::ExtractFailed(
+                    "Executável não tem permissão de execução após finalização".to_string(),
+                )
+                .into(),
+            );
+        }
+    }
 
     let now = time::OffsetDateTime::now_utc();
     let installed_at = now
@@ -451,15 +537,12 @@ async fn extract_tar_gz(tar_gz_path: PathBuf, dest: PathBuf) -> Result<(), Insta
             let entry_path = entry.path()?;
 
             // Path traversal protection: reject .. components, absolute paths, and Windows prefixes
-            if entry_path
-                .components()
-                .any(|c| matches!(c, Component::RootDir | Component::Prefix(_)))
-            {
-                return Err(InstallError::ExtractFailed(
-                    "entrada insegura no arquivo".to_string(),
-                ));
-            }
-            if entry_path.components().any(|c| c.as_os_str() == "..") {
+            if entry_path.components().any(|c| {
+                matches!(
+                    c,
+                    Component::RootDir | Component::Prefix(_) | Component::ParentDir
+                )
+            }) {
                 return Err(InstallError::ExtractFailed(
                     "entrada insegura no arquivo".to_string(),
                 ));
@@ -492,7 +575,7 @@ async fn extract_tar_gz(tar_gz_path: PathBuf, dest: PathBuf) -> Result<(), Insta
 }
 
 async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(), InstallError> {
-    // Check if there's a single top-level folder
+    // Check if there's a single top-level folder (like "Weft/")
     let mut entries = fs::read_dir(extract_dir).await?;
     let mut first_entry = None;
     let mut entry_count = 0;
@@ -509,13 +592,79 @@ async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(
         && let Some(single_dir) = first_entry
         && single_dir.is_dir()
     {
+        // Collect entries first to avoid concurrent modification issues
+        let mut entries_to_move = Vec::new();
         let mut entries = fs::read_dir(&single_dir).await?;
         while let Some(entry) = entries.next_entry().await? {
-            let target = extract_dir.join(entry.file_name());
-            fs::rename(entry.path(), target).await?;
+            // Get metadata from DirEntry directly (more reliable on Windows)
+            let metadata = entry.metadata().await.ok();
+            entries_to_move.push((entry, metadata));
         }
+        for (entry, metadata) in entries_to_move {
+            let source = entry.path();
+            let target = extract_dir.join(entry.file_name());
+            eprintln!("Normalize: moving {:?} -> {:?}", source, target);
+            // Ensure source exists
+            if !source.exists() {
+                eprintln!("Source does not exist, skipping");
+                continue;
+            }
+            // On Windows, remove target first if it exists (rename fails if target exists)
+            if target.exists() {
+                if target.is_dir() {
+                    fs::remove_dir_all(&target).await?;
+                } else {
+                    fs::remove_file(&target).await?;
+                }
+            }
+            eprintln!("  About to rename...");
+            // On Windows, rename can fail for files; use copy+remove as fallback
+            #[cfg(windows)]
+            {
+                let is_file = metadata.as_ref().map(|m| m.file_type().is_file()).unwrap_or(false);
+                eprintln!("  Windows branch, is_file={}", is_file);
+                if is_file {
+                    eprintln!("  Trying copy...");
+                    // On Windows, file might not be immediately accessible after tar extraction
+                    // Retry a few times
+                    let mut last_err = None;
+                    for attempt in 0..5 {
+                        match fs::copy(&source, &target).await {
+                            Ok(_) => {
+                                eprintln!("  Copy succeeded on attempt {}", attempt + 1);
+                                last_err = None;
+                                break;
+                            }
+                            Err(e) => {
+                                let err_msg = e.to_string();
+                                last_err = Some(e);
+                                eprintln!("  Copy attempt {} failed: {}, retrying...", attempt + 1, err_msg);
+                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                            }
+                        }
+                    }
+                    if let Some(e) = last_err {
+                        return Err(e.into());
+                    }
+                    eprintln!("  Copy succeeded, removing source...");
+                    fs::remove_file(&source).await?;
+                    eprintln!("  Copy+remove succeeded");
+                } else {
+                    fs::rename(&source, &target).await?;
+                    eprintln!("  Rename succeeded");
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                fs::rename(&source, &target).await?;
+                eprintln!("  Rename succeeded");
+            }
+        }
+        eprintln!("Removing single_dir: {:?}", single_dir);
         fs::remove_dir(single_dir).await?;
+        eprintln!("remove_dir succeeded");
     }
+    // If there are multiple entries or a single file at root, that's fine - already normalized
 
     Ok(())
 }
@@ -540,11 +689,7 @@ pub async fn get_installed_versions(
         }
 
         let tag = entry.file_name().to_string_lossy().to_string();
-        let executable_name = if cfg!(target_os = "windows") {
-            "weft.exe"
-        } else {
-            "weft"
-        };
+        let executable_name = executable_name();
         let executable = path.join(executable_name);
 
         if executable.exists() {
@@ -612,5 +757,237 @@ pub async fn remove_version(app_handle: tauri::AppHandle, tag: String) -> Result
                 Err(e.into())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::tempdir;
+    use tokio::fs;
+
+    /// Creates a minimal valid tar.gz in memory with structure:
+    /// Weft/weft (executable) - uses platform-specific name
+    /// Weft/assets/a.txt
+    /// Weft/run/
+    fn create_test_tar_gz() -> Vec<u8> {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use tar::Builder;
+
+        let exe_name = executable_name();
+        let mut gz = GzEncoder::new(Vec::new(), Compression::default());
+        {
+            let mut ar = Builder::new(&mut gz);
+            // Weft/ (directory) - explicit parent directory
+            let mut header = tar::Header::new_gnu();
+            header.set_path("Weft/").unwrap();
+            header.set_mode(0o755);
+            header.set_entry_type(tar::EntryType::Directory);
+            header.set_size(0);
+            header.set_cksum();
+            ar.append(&header, &b""[..]).unwrap();
+
+            // Weft/assets/ (directory) - explicit parent directory
+            let mut header = tar::Header::new_gnu();
+            header.set_path("Weft/assets/").unwrap();
+            header.set_mode(0o755);
+            header.set_entry_type(tar::EntryType::Directory);
+            header.set_size(0);
+            header.set_cksum();
+            ar.append(&header, &b""[..]).unwrap();
+
+            // Weft/<exe_name> (executable)
+            let exe_path = format!("Weft/{}", exe_name);
+            let mut header = tar::Header::new_gnu();
+            header.set_path(&exe_path).unwrap();
+            header.set_mode(0o755);
+            header.set_size(4);
+            header.set_entry_type(tar::EntryType::Regular);
+            header.set_cksum();
+            ar.append(&header, &b"fake"[..]).unwrap();
+
+            // Weft/assets/a.txt
+            let mut header = tar::Header::new_gnu();
+            header.set_path("Weft/assets/a.txt").unwrap();
+            header.set_mode(0o644);
+            header.set_size(1);
+            header.set_entry_type(tar::EntryType::Regular);
+            header.set_cksum();
+            ar.append(&header, &b"a"[..]).unwrap();
+
+            // Weft/run/ (directory)
+            let mut header = tar::Header::new_gnu();
+            header.set_path("Weft/run/").unwrap();
+            header.set_mode(0o755);
+            header.set_entry_type(tar::EntryType::Directory);
+            header.set_size(0);
+            header.set_cksum();
+            ar.append(&header, &b""[..]).unwrap();
+        }
+        gz.finish().unwrap()
+    }
+
+    /// Creates a minimal zip with executable at root (platform-specific name)
+    fn create_test_zip() -> Vec<u8> {
+        use zip::write::FileOptions;
+        use zip::CompressionMethod;
+
+        let mut buf = Vec::new();
+        {
+            let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+            let options = FileOptions::default()
+                .compression_method(CompressionMethod::Stored)
+                .unix_permissions(0o755);
+            let exe_name = executable_name();
+            zip.start_file(exe_name, options).unwrap();
+            zip.write_all(b"fake").unwrap();
+            zip.finish().unwrap();
+        }
+        buf
+    }
+
+    /// Creates a tar.gz with path traversal attempt (../fora.txt)
+    /// Uses raw tar format to bypass tar crate's path validation during creation
+    fn create_malicious_tar_gz() -> Vec<u8> {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use std::io::Write;
+
+        let mut gz = GzEncoder::new(Vec::new(), Compression::default());
+        {
+            // Manually write a tar entry with ../fora.txt path
+            // Tar format: 512-byte header + padded data
+            let mut header = [0u8; 512];
+            // Name field (100 bytes)
+            let name = b"../fora.txt";
+            header[0..name.len()].copy_from_slice(name);
+            // Mode (8 bytes, octal)
+            let mode = b"0000644 ";
+            header[100..108].copy_from_slice(mode);
+            // UID (8 bytes)
+            header[108..116].copy_from_slice(b"0000000 ");
+            // GID (8 bytes)
+            header[116..124].copy_from_slice(b"0000000 ");
+            // Size (12 bytes, octal) - 4 bytes
+            let size = b"00000000004 ";
+            header[124..136].copy_from_slice(size);
+            // Mtime (12 bytes)
+            header[136..148].copy_from_slice(b"00000000000 ");
+            // Checksum (8 bytes) - will compute
+            // Typeflag (1 byte) - regular file
+            header[156] = b'0';
+            // Magic (6 bytes) - "ustar\0"
+            header[257..263].copy_from_slice(b"ustar\0");
+            // Version (2 bytes) - "00"
+            header[263..265].copy_from_slice(b"00");
+            // Compute checksum (sum of all bytes, with checksum field treated as spaces)
+            let mut checksum: u32 = 0;
+            for (i, &byte) in header.iter().enumerate() {
+                if i >= 148 && i < 156 {
+                    checksum += b' ' as u32;
+                } else {
+                    checksum += byte as u32;
+                }
+            }
+            // Format as 6 octal digits + null + space (8 bytes total)
+            let checksum_str = format!("{:06o}\0 ", checksum);
+            header[148..156].copy_from_slice(checksum_str.as_bytes());
+
+            gz.write_all(&header).unwrap();
+            gz.write_all(b"evil").unwrap();
+            // Pad to 512 bytes
+            gz.write_all(&[0u8; 508]).unwrap();
+            // End of archive (two 512-byte blocks of zeros)
+            gz.write_all(&[0u8; 1024]).unwrap();
+        }
+        gz.finish().unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_tar_gz_extraction_normalizes_structure() {
+        let tmp = tempdir().unwrap();
+        let tar_gz_path = tmp.path().join("test.tar.gz");
+        let extract_dir = tmp.path().join("extract");
+
+        fs::write(&tar_gz_path, create_test_tar_gz()).await.unwrap();
+        fs::create_dir_all(&extract_dir).await.unwrap();
+
+        // Extract
+        extract_tar_gz(tar_gz_path, extract_dir.clone()).await.unwrap();
+
+        // Debug: list directory contents after extraction
+        let mut entries = fs::read_dir(&extract_dir).await.unwrap();
+        eprintln!("After extraction, extract_dir contents:");
+        while let Some(entry) = entries.next_entry().await.unwrap() {
+            eprintln!("  {:?} (is_dir={})", entry.path(), entry.path().is_dir());
+            if entry.path().is_dir() {
+                let mut sub = fs::read_dir(entry.path()).await.unwrap();
+                while let Some(sub_entry) = sub.next_entry().await.unwrap() {
+                    eprintln!("    {:?}", sub_entry.path());
+                }
+            }
+        }
+
+        // Normalize (should move Weft/* up)
+        normalize_install_structure(&extract_dir, "v1.0.0").await.unwrap();
+
+        // Verify structure: weft executable at root, assets/ and run/ at root
+        let weft_path = extract_dir.join(executable_name());
+        assert!(weft_path.exists(), "weft executable should exist at root");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let metadata = fs::metadata(&weft_path).await.unwrap();
+            assert_eq!(metadata.mode() & 0o111, 0o111, "executable should have execute bits");
+        }
+
+        assert!(extract_dir.join("assets").join("a.txt").exists(), "assets/a.txt should exist");
+        assert!(extract_dir.join("run").exists(), "run/ directory should exist");
+
+        // No leftover Weft/ directory
+        assert!(!extract_dir.join("Weft").exists(), "Weft/ directory should be removed");
+    }
+
+    #[tokio::test]
+    async fn test_zip_extraction_executable_at_root() {
+        let tmp = tempdir().unwrap();
+        let zip_path = tmp.path().join("test.zip");
+        let extract_dir = tmp.path().join("extract");
+
+        fs::write(&zip_path, create_test_zip()).await.unwrap();
+        fs::create_dir_all(&extract_dir).await.unwrap();
+
+        // Extract
+        extract_zip(zip_path, extract_dir.clone()).await.unwrap();
+
+        // Verify weft executable at root
+        let weft_path = extract_dir.join(executable_name());
+        assert!(weft_path.exists(), "weft executable should exist at root");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let metadata = fs::metadata(&weft_path).await.unwrap();
+            assert_eq!(metadata.mode() & 0o111, 0o111, "executable should have execute bits");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_tar_gz_rejects_path_traversal() {
+        let tmp = tempdir().unwrap();
+        let tar_gz_path = tmp.path().join("malicious.tar.gz");
+        let extract_dir = tmp.path().join("extract");
+
+        fs::write(&tar_gz_path, create_malicious_tar_gz()).await.unwrap();
+        fs::create_dir_all(&extract_dir).await.unwrap();
+
+        // Should fail with ExtractFailed
+        let result = extract_tar_gz(tar_gz_path, extract_dir).await;
+        assert!(result.is_err(), "should reject path traversal");
+        let err = result.unwrap_err();
+        assert!(matches!(err, InstallError::ExtractFailed(_)), "should be ExtractFailed");
     }
 }
