@@ -88,6 +88,7 @@ impl From<crate::launch::LaunchError> for AppError {
             LogDirCreateFailed(msg) => AppError::new("logDirCreateFailed", Some(msg)),
             GameFolderNotFound(msg) => AppError::new("gameFolderNotFound", Some(msg)),
             OpenerError(e) => AppError::new("openerError", Some(e.to_string())),
+            OpenGameFolderError(msg) => AppError::new("openerError", Some(msg)),
         }
     }
 }

@@ -3,7 +3,7 @@ use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::File as StdFile;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use tauri::{Emitter, Manager};
 use thiserror::Error;
@@ -521,57 +521,216 @@ async fn extract_zip(zip_path: PathBuf, dest: PathBuf) -> Result<(), InstallErro
     .map_err(|e| InstallError::ExtractFailed(e.to_string()))?
 }
 
+/// Normalize an entry path from the tar archive:
+/// - Reject absolute paths and paths containing ".." components
+/// - Strip leading "./" if present
+/// - Strip top-level "Weft/" directory if present
+///
+/// Returns None if the entry should be skipped (e.g., symlinks, invalid paths)
+fn normalize_entry_path(entry_path: &Path) -> Option<PathBuf> {
+    // Reject absolute paths
+    if entry_path.is_absolute() {
+        return None;
+    }
+
+    // Check for path traversal components
+    for component in entry_path.components() {
+        match component {
+            Component::ParentDir => return None, // ".."
+            Component::RootDir => return None,   // absolute (redundant but safe)
+            Component::Prefix(_) => return None, // Windows prefix
+            _ => {}
+        }
+    }
+
+    let mut path = entry_path.to_path_buf();
+
+    // Strip leading "./" if present
+    if path.starts_with(".") {
+        path = path.strip_prefix(".").unwrap_or(&path).to_path_buf();
+        // Strip leading separator if present
+        if let Some(first) = path.components().next()
+            && matches!(first, Component::RootDir)
+        {
+            path = path.strip_prefix(first.as_os_str()).unwrap_or(&path).to_path_buf();
+        }
+    }
+
+    // Strip top-level "Weft/" directory if present
+    if let Some(Component::Normal(name)) = path.components().next()
+        && name == "Weft"
+    {
+        path = path.strip_prefix("Weft").unwrap_or(&path).to_path_buf();
+        // Strip leading separator if present
+        if let Some(first) = path.components().next()
+            && matches!(first, Component::RootDir)
+        {
+            path = path.strip_prefix(first.as_os_str()).unwrap_or(&path).to_path_buf();
+        }
+    }
+
+    // Skip empty paths (can happen if archive only had "Weft/" directory entry)
+    if path.as_os_str().is_empty() {
+        return None;
+    }
+
+    Some(path)
+}
+
+/// Build a full error chain message from an error and its sources.
+fn build_error_chain(err: &dyn std::error::Error) -> String {
+    let mut msg = err.to_string();
+    let mut source = err.source();
+    while let Some(src) = source {
+        msg.push_str(": ");
+        msg.push_str(&src.to_string());
+        source = src.source();
+    }
+    msg
+}
+
 async fn extract_tar_gz(tar_gz_path: PathBuf, dest: PathBuf) -> Result<(), InstallError> {
     // Run extraction in blocking task to avoid Send issues with tar crate types
     tokio::task::spawn_blocking(move || -> Result<(), InstallError> {
-        let file = StdFile::open(&tar_gz_path)?;
-        let decoder = flate2::read::GzDecoder::new(file);
+        let file = StdFile::open(&tar_gz_path)
+            .map_err(|e| InstallError::ExtractFailed(format!("failed to open archive: {}", build_error_chain(&e))))?;
+        let decoder = flate2::read::MultiGzDecoder::new(file);
         let mut archive = tar::Archive::new(decoder);
 
         let mut extracted_count = 0;
 
-        // Collect all entries first
-        let entries: Vec<_> = archive.entries()?.collect::<Result<Vec<_>, _>>()?;
+        for entry_result in archive.entries()? {
+            let mut entry = entry_result
+                .map_err(|e| InstallError::ExtractFailed(format!("failed to read tar entry: {}", build_error_chain(&e))))?;
 
-        for mut entry in entries {
-            let entry_path = entry.path()?;
+            let entry_path = entry.path()
+                .map_err(|e| InstallError::ExtractFailed(format!("failed to get entry path: {}", build_error_chain(&e))))?;
 
-            // Path traversal protection: reject .. components, absolute paths, and Windows prefixes
-            if entry_path.components().any(|c| {
-                matches!(
-                    c,
-                    Component::RootDir | Component::Prefix(_) | Component::ParentDir
-                )
-            }) {
-                return Err(InstallError::ExtractFailed(
-                    "entrada insegura no arquivo".to_string(),
-                ));
-            }
-
-            let target_path = dest.join(entry_path);
-
-            if entry.header().entry_type().is_dir() {
-                std::fs::create_dir_all(&target_path)?;
-            } else {
-                if let Some(parent) = target_path.parent() {
-                    std::fs::create_dir_all(parent)?;
+            // Normalize path (handles path traversal, strips Weft/ prefix, etc.)
+            let normalized_path = match normalize_entry_path(&entry_path) {
+                Some(p) => p,
+                None => {
+                    // Log skipped entries (symlinks, invalid paths, etc.)
+                    eprintln!("Skipping tar entry: {:?} (invalid or symlink)", entry_path);
+                    continue;
                 }
-                entry.unpack(&target_path)?;
+            };
+
+            let target_path = dest.join(&normalized_path);
+            let entry_type = entry.header().entry_type();
+
+            if entry_type.is_dir() {
+                // Create directory
+                std::fs::create_dir_all(&target_path)
+                    .map_err(|e| InstallError::ExtractFailed(format!(
+                        "failed to create directory {}: {}",
+                        target_path.display(),
+                        build_error_chain(&e)
+                    )))?;
+            } else if entry_type.is_file() {
+                // Regular file: ensure parent dir exists, then copy
+                if let Some(parent) = target_path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|e| InstallError::ExtractFailed(format!(
+                            "failed to create parent directory for {}: {}",
+                            target_path.display(),
+                            build_error_chain(&e)
+                        )))?;
+                }
+
+                let mut outfile = StdFile::create(&target_path)
+                    .map_err(|e| InstallError::ExtractFailed(format!(
+                        "failed to create file {}: {}",
+                        target_path.display(),
+                        build_error_chain(&e)
+                    )))?;
+
+                let expected_size = entry.header().size()
+                    .map_err(|e| InstallError::ExtractFailed(format!(
+                        "failed to get entry size for {}: {}",
+                        target_path.display(),
+                        build_error_chain(&e)
+                    )))?;
+
+                let mut bytes_copied = 0u64;
+                {
+                    let entry_reader = entry.by_ref();
+                    let mut buffer = [0u8; 8192];
+                    loop {
+                        let n = entry_reader.read(&mut buffer)
+                            .map_err(|e| InstallError::ExtractFailed(format!(
+                                "failed to read entry data for {}: {}",
+                                target_path.display(),
+                                build_error_chain(&e)
+                            )))?;
+                        if n == 0 {
+                            break;
+                        }
+                        outfile.write_all(&buffer[..n])
+                            .map_err(|e| InstallError::ExtractFailed(format!(
+                                "failed to write to {}: {}",
+                                target_path.display(),
+                                build_error_chain(&e)
+                            )))?;
+                        bytes_copied += n as u64;
+                    }
+                }
+
+                outfile.flush()
+                    .map_err(|e| InstallError::ExtractFailed(format!(
+                        "failed to flush {}: {}",
+                        target_path.display(),
+                        build_error_chain(&e)
+                    )))?;
+
+                // Verify we copied the expected amount
+                if bytes_copied != expected_size {
+                    return Err(InstallError::ExtractFailed(format!(
+                        "truncated file {}: expected {} bytes, got {}",
+                        target_path.display(),
+                        expected_size,
+                        bytes_copied
+                    )));
+                }
+
+                // Set permissions on Unix
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let mode = entry.header().mode()
+                        .map_err(|e| InstallError::ExtractFailed(format!(
+                            "failed to get entry mode for {}: {}",
+                            target_path.display(),
+                            build_error_chain(&e)
+                        )))?;
+                    let perm = std::fs::Permissions::from_mode((mode & 0o777).max(0o644));
+                    std::fs::set_permissions(&target_path, perm)
+                        .map_err(|e| InstallError::ExtractFailed(format!(
+                            "failed to set permissions on {}: {}",
+                            target_path.display(),
+                            build_error_chain(&e)
+                        )))?;
+                }
+
+            } else {
+                // Skip symlinks, hardlinks, char devices, block devices, fifos, etc.
+                eprintln!("Skipping tar entry: {:?} (type: {:?})", entry_path, entry_type);
+                continue;
             }
+
             extracted_count += 1;
         }
 
         if extracted_count == 0 {
             return Err(InstallError::ExtractFailed(
-                "nenhum arquivo extraído (arquivo vazio ou todas as entradas inseguras)"
-                    .to_string(),
+                "no files extracted (archive empty or all entries unsafe)".to_string(),
             ));
         }
 
         Ok(())
     })
     .await
-    .map_err(|e| InstallError::ExtractFailed(e.to_string()))?
+    .map_err(|e| InstallError::ExtractFailed(format!("extraction task failed: {}", build_error_chain(&e))))?
 }
 
 async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(), InstallError> {
@@ -774,14 +933,15 @@ mod tests {
     fn create_test_tar_gz() -> Vec<u8> {
         use flate2::write::GzEncoder;
         use flate2::Compression;
-        use tar::Builder;
+        use tar::Header;
 
         let exe_name = executable_name();
         let mut gz = GzEncoder::new(Vec::new(), Compression::default());
         {
-            let mut ar = Builder::new(&mut gz);
+            let mut ar = tar::Builder::new(&mut gz);
+
             // Weft/ (directory) - explicit parent directory
-            let mut header = tar::Header::new_gnu();
+            let mut header = Header::new_gnu();
             header.set_path("Weft/").unwrap();
             header.set_mode(0o755);
             header.set_entry_type(tar::EntryType::Directory);
@@ -790,7 +950,7 @@ mod tests {
             ar.append(&header, &b""[..]).unwrap();
 
             // Weft/assets/ (directory) - explicit parent directory
-            let mut header = tar::Header::new_gnu();
+            let mut header = Header::new_gnu();
             header.set_path("Weft/assets/").unwrap();
             header.set_mode(0o755);
             header.set_entry_type(tar::EntryType::Directory);
@@ -800,7 +960,7 @@ mod tests {
 
             // Weft/<exe_name> (executable)
             let exe_path = format!("Weft/{}", exe_name);
-            let mut header = tar::Header::new_gnu();
+            let mut header = Header::new_gnu();
             header.set_path(&exe_path).unwrap();
             header.set_mode(0o755);
             header.set_size(4);
@@ -809,7 +969,7 @@ mod tests {
             ar.append(&header, &b"fake"[..]).unwrap();
 
             // Weft/assets/a.txt
-            let mut header = tar::Header::new_gnu();
+            let mut header = Header::new_gnu();
             header.set_path("Weft/assets/a.txt").unwrap();
             header.set_mode(0o644);
             header.set_size(1);
@@ -818,7 +978,7 @@ mod tests {
             ar.append(&header, &b"a"[..]).unwrap();
 
             // Weft/run/ (directory)
-            let mut header = tar::Header::new_gnu();
+            let mut header = Header::new_gnu();
             header.set_path("Weft/run/").unwrap();
             header.set_mode(0o755);
             header.set_entry_type(tar::EntryType::Directory);
@@ -827,6 +987,115 @@ mod tests {
             ar.append(&header, &b""[..]).unwrap();
         }
         gz.finish().unwrap()
+    }
+
+    /// Creates a tar.gz with Weft/assets/core/textures/entity/player.png (271 bytes),
+    /// Weft/weft executable, and Weft/run/ directory, WITHOUT directory entries for intermediate paths.
+    fn create_test_tar_gz_no_dir_entries() -> Vec<u8> {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use tar::Header;
+        use std::io::Cursor;
+
+        let player_content = vec![0x42u8; 271]; // 271 bytes of dummy data
+        let exe_name = executable_name();
+
+        let mut gz = GzEncoder::new(Vec::new(), Compression::default());
+        {
+            let mut ar = tar::Builder::new(&mut gz);
+
+            // Weft/weft (executable) - no Weft/ directory entry
+            let exe_path = format!("Weft/{}", exe_name);
+            let mut header = Header::new_gnu();
+            header.set_path(&exe_path).unwrap();
+            header.set_mode(0o755);
+            header.set_size(4);
+            header.set_entry_type(tar::EntryType::Regular);
+            header.set_cksum();
+            ar.append(&header, &b"fake"[..]).unwrap();
+
+            // Weft/assets/core/textures/entity/player.png (271 bytes) - no intermediate dir entries
+            let mut header = Header::new_gnu();
+            header.set_path("Weft/assets/core/textures/entity/player.png").unwrap();
+            header.set_mode(0o644);
+            header.set_size(player_content.len() as u64);
+            header.set_entry_type(tar::EntryType::Regular);
+            header.set_cksum();
+            ar.append(&header, Cursor::new(player_content)).unwrap();
+
+            // Weft/run/ (directory)
+            let mut header = Header::new_gnu();
+            header.set_path("Weft/run/").unwrap();
+            header.set_mode(0o755);
+            header.set_entry_type(tar::EntryType::Directory);
+            header.set_size(0);
+            header.set_cksum();
+            ar.append(&header, &b""[..]).unwrap();
+        }
+        gz.finish().unwrap()
+    }
+
+    /// Creates a tar.gz with a single tar archive split across two concatenated gzip members (tests MultiGzDecoder)
+    fn create_test_tar_gz_concatenated() -> Vec<u8> {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use tar::Header;
+        use std::io::Cursor;
+
+        let exe_name = executable_name();
+
+        // Create the complete tar archive in memory first
+        let mut tar_data = Vec::new();
+        {
+            let mut ar = tar::Builder::new(&mut tar_data);
+
+            // Weft/weft (executable)
+            let exe_path = format!("Weft/{}", exe_name);
+            let mut header = Header::new_gnu();
+            header.set_path(&exe_path).unwrap();
+            header.set_mode(0o755);
+            header.set_size(4);
+            header.set_entry_type(tar::EntryType::Regular);
+            header.set_cksum();
+            ar.append(&header, &b"fake"[..]).unwrap();
+
+            // Weft/assets/a.txt
+            let mut header = Header::new_gnu();
+            header.set_path("Weft/assets/a.txt").unwrap();
+            header.set_mode(0o644);
+            header.set_size(1);
+            header.set_entry_type(tar::EntryType::Regular);
+            header.set_cksum();
+            ar.append(&header, &b"a"[..]).unwrap();
+
+            // Weft/run/ (directory)
+            let mut header = Header::new_gnu();
+            header.set_path("Weft/run/").unwrap();
+            header.set_mode(0o755);
+            header.set_entry_type(tar::EntryType::Directory);
+            header.set_size(0);
+            header.set_cksum();
+            ar.append(&header, &b""[..]).unwrap();
+        }
+
+        // Now split the tar data into two parts and compress each as a separate gzip member
+        let mid = tar_data.len() / 2;
+        let first_half = &tar_data[..mid];
+        let second_half = &tar_data[mid..];
+
+        let mut gz1 = GzEncoder::new(Vec::new(), Compression::default());
+        std::io::copy(&mut Cursor::new(first_half), &mut gz1).unwrap();
+        let first_member = gz1.finish().unwrap();
+
+        let mut gz2 = GzEncoder::new(Vec::new(), Compression::default());
+        std::io::copy(&mut Cursor::new(second_half), &mut gz2).unwrap();
+        let second_member = gz2.finish().unwrap();
+
+        // Concatenate both gzip members
+        let mut combined = Vec::new();
+        combined.extend_from_slice(&first_member);
+        combined.extend_from_slice(&second_member);
+        combined
     }
 
     /// Creates a minimal zip with executable at root (platform-specific name)
@@ -989,5 +1258,70 @@ mod tests {
         assert!(result.is_err(), "should reject path traversal");
         let err = result.unwrap_err();
         assert!(matches!(err, InstallError::ExtractFailed(_)), "should be ExtractFailed");
+    }
+
+    #[tokio::test]
+    async fn test_tar_gz_no_dir_entries() {
+        let tmp = tempdir().unwrap();
+        let tar_gz_path = tmp.path().join("test_no_dir_entries.tar.gz");
+        let extract_dir = tmp.path().join("extract");
+
+        fs::write(&tar_gz_path, create_test_tar_gz_no_dir_entries()).await.unwrap();
+        fs::create_dir_all(&extract_dir).await.unwrap();
+
+        // Extract
+        extract_tar_gz(tar_gz_path, extract_dir.clone()).await.unwrap();
+
+        // Normalize (should move Weft/* up)
+        normalize_install_structure(&extract_dir, "v1.0.0").await.unwrap();
+
+        // Verify structure: weft executable at root, assets/ and run/ at root
+        let weft_path = extract_dir.join(executable_name());
+        assert!(weft_path.exists(), "weft executable should exist at root");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let metadata = fs::metadata(&weft_path).await.unwrap();
+            assert_eq!(metadata.mode() & 0o111, 0o111, "executable should have execute bits");
+        }
+
+        // Verify player.png exists with correct size (271 bytes)
+        let player_path = extract_dir.join("assets").join("core").join("textures").join("entity").join("player.png");
+        assert!(player_path.exists(), "player.png should exist");
+        let metadata = fs::metadata(&player_path).await.unwrap();
+        assert_eq!(metadata.len(), 271, "player.png should be 271 bytes");
+
+        // Verify run/ directory exists
+        assert!(extract_dir.join("run").exists(), "run/ directory should exist");
+
+        // No leftover Weft/ directory
+        assert!(!extract_dir.join("Weft").exists(), "Weft/ directory should be removed");
+    }
+
+    #[tokio::test]
+    async fn test_tar_gz_concatenated_gzip_members() {
+        let tmp = tempdir().unwrap();
+        let tar_gz_path = tmp.path().join("test_concat.tar.gz");
+        let extract_dir = tmp.path().join("extract");
+
+        fs::write(&tar_gz_path, create_test_tar_gz_concatenated()).await.unwrap();
+        fs::create_dir_all(&extract_dir).await.unwrap();
+
+        // Extract - should read both concatenated gzip members
+        extract_tar_gz(tar_gz_path, extract_dir.clone()).await.unwrap();
+
+        // Normalize (should move Weft/* up)
+        normalize_install_structure(&extract_dir, "v1.0.0").await.unwrap();
+
+        // Verify both files from both members exist
+        let weft_path = extract_dir.join(executable_name());
+        assert!(weft_path.exists(), "weft executable from first member should exist");
+
+        let assets_path = extract_dir.join("assets").join("a.txt");
+        assert!(assets_path.exists(), "a.txt from second member should exist");
+
+        // No leftover Weft/ directory
+        assert!(!extract_dir.join("Weft").exists(), "Weft/ directory should be removed");
     }
 }

@@ -30,9 +30,12 @@ pub enum LaunchError {
     GameFolderNotFound(String),
     #[error("Erro ao abrir pasta: {0}")]
     OpenerError(#[from] OpenerError),
+    #[error("Falha ao abrir pasta do jogo: {0}")]
+    OpenGameFolderError(String),
 }
 
 /// Remove ANSI escape codes from a string.
+#[allow(dead_code)]
 fn strip_ansi_codes(input: &str) -> String {
     let mut result = String::with_capacity(input.len());
     let mut chars = input.chars().peekable();
@@ -92,6 +95,7 @@ fn strip_ansi_codes(input: &str) -> String {
 }
 
 /// Extract game folder path from a log line containing "game folder <path>, cache <path>".
+#[allow(dead_code)]
 fn extract_game_folder_path(line: &str) -> Option<String> {
     let cleaned = strip_ansi_codes(line);
     let prefix = "game folder ";
@@ -321,51 +325,53 @@ pub async fn get_running_versions(app_handle: AppHandle) -> Result<Vec<String>, 
 }
 
 #[tauri::command]
-pub async fn open_game_folder(app_handle: AppHandle, _tag: String) -> Result<(), AppError> {
-    let logs_dir = get_logs_dir(&app_handle)?;
+pub async fn open_game_folder(app_handle: AppHandle, _tag: String) -> Result<String, AppError> {
+    // Get app data directory
+    let app_data = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| LaunchError::OpenGameFolderError(format!("failed to get app data dir: {}", e)))?;
 
-    // Read all log files, sort by modification time (newest first)
-    let mut entries = fs::read_dir(&logs_dir).await?;
-    let mut log_files: Vec<_> = Vec::new();
-    while let Some(entry) = entries.next_entry().await? {
-        let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()) == Some("log")
-            && let Ok(metadata) = entry.metadata().await
-            && let Ok(modified) = metadata.modified()
-        {
-            log_files.push((path, modified));
-        }
-    }
+    // Create instances/default/run directory
+    let game_folder = app_data.clone();
+    fs::create_dir_all(&game_folder).await
+        .map_err(|e| LaunchError::OpenGameFolderError(format!("failed to create game folder: {}", e)))?;
 
-    // Sort by modification time, newest first
-    log_files.sort_by_key(|a| std::cmp::Reverse(a.1));
+    // Try to open with tauri-plugin-opener first
+    let path_str = game_folder.to_string_lossy().to_string();
+    let open_result = app_handle
+        .opener()
+        .open_path(&path_str, None::<&str>);
 
-    // Search each log file for the "game folder" line
-    for (log_path, _) in log_files {
-        let file = fs::File::open(&log_path).await?;
-        let reader = BufReader::new(file);
-        let mut lines = reader.lines();
-
-        while let Ok(Some(line)) = lines.next_line().await {
-            if let Some(game_folder) = extract_game_folder_path(&line) {
-                let game_folder_path = PathBuf::from(&game_folder);
-                if game_folder_path.exists() {
-                    app_handle
-                        .opener()
-                        .open_path(game_folder_path.to_string_lossy().as_ref(), None::<&str>)
-                        .map_err(LaunchError::OpenerError)?;
-                    return Ok(());
+    match open_result {
+        Ok(_) => Ok(path_str),
+        Err(opener_err) => {
+            // On Linux, try xdg-open as fallback
+            #[cfg(target_os = "linux")]
+            {
+                let xdg_result = std::process::Command::new("xdg-open")
+                    .arg(&path_str)
+                    .status();
+                match xdg_result {
+                    Ok(status) if status.success() => return Ok(path_str),
+                    Ok(status) => {
+                        return Err(LaunchError::OpenGameFolderError(format!(
+                            "xdg-open failed with exit code: {:?}",
+                            status.code()
+                        )).into());
+                    }
+                    Err(e) => {
+                        return Err(LaunchError::OpenGameFolderError(format!(
+                            "both tauri opener and xdg-open failed: opener: {}, xdg-open: {}",
+                            opener_err, e
+                        )).into());
+                    }
                 }
-                // Path from log doesn't exist, continue searching
             }
+            // On non-Linux, return the opener error
+            Err(LaunchError::OpenGameFolderError(format!("failed to open folder: {}", opener_err)).into())
         }
     }
-
-    // No valid game folder found in any log
-    Err(LaunchError::GameFolderNotFound(
-        "Game folder not found in logs (game may not have been launched yet)".to_string(),
-    )
-    .into())
 }
 
 #[tauri::command]

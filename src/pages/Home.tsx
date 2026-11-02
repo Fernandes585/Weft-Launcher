@@ -16,6 +16,7 @@ export function Home({ onGoToVersions, latestTag }: { onGoToVersions: () => void
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [gameError, setGameError] = useState<{ tag: string; exitCode: number } | null>(null);
+  const [gameFolderPath, setGameFolderPath] = useState<string | null>(null);
 
   const sortedVersions = useMemo(
   () => [...installedVersions].sort((a, b) => compareTags(b.tag, a.tag)),
@@ -99,7 +100,8 @@ export function Home({ onGoToVersions, latestTag }: { onGoToVersions: () => void
     if (!effectiveTag) return;
     setLaunchError(null);
     try {
-      await invoke("open_game_folder", { tag: effectiveTag });
+      const path = await invoke<string>("open_game_folder", { tag: effectiveTag });
+      setGameFolderPath(path);
     } catch (err) {
       setLaunchError(translateError(err));
     }
@@ -197,11 +199,14 @@ export function Home({ onGoToVersions, latestTag }: { onGoToVersions: () => void
                 <span className="detail-value path">{selectedVersion.executable}</span>
               </div>
               <div className="detail-row">
-  <span className="detail-label">{t("gameFolderTitle")}</span>
-  <button className="btn-flat btn-secondary btn-open-folder" onClick={handleOpenFolder}>
-  {t("openFolderButton")}
-</button>
-</div>
+                <span className="detail-label">{t("gameFolderTitle")}</span>
+                <span className="detail-value path">{gameFolderPath || t("gameFolderPath")}</span>
+              </div>
+              <div className="detail-row">
+                <button className="btn-flat btn-secondary btn-open-folder" onClick={handleOpenFolder}>
+                  {t("openFolderButton")}
+                </button>
+              </div>
             </>
           ) : (
             <p className="select-version-hint">{t("selectVersionHint")}</p>
