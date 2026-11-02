@@ -1,14 +1,13 @@
 /* Weft Launcher: layout e componentes (estilo inspirado no launcher do Horizon) */
 
-/* ---------- Estrutura: abas em cima, barra lateral à esquerda, conteúdo à direita ---------- */
+/* ---------- Estrutura: abas em cima, conteúdo ocupando largura total ---------- */
 .app-layout {
-  --sidebar-w: 240px;
   display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    "tabs tabs"
-    "side page";
+    "tabs"
+    "page";
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
@@ -931,54 +930,8 @@
    RESPONSIVO
    ===================================================================== */
 
-/* telas médias: barra lateral mais estreita */
-@media (max-width: 960px) {
-  .app-layout {
-    --sidebar-w: 200px;
-  }
-}
-
-/* telas pequenas: a barra lateral vira uma faixa horizontal abaixo das abas */
+/* telas pequenas: ajustes gerais */
 @media (max-width: 720px) {
-  .app-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas:
-      "tabs"
-      "side"
-      "page";
-  }
-
-  .sidebar {
-    flex-direction: row;
-    align-items: center;
-    border-right: none;
-    border-bottom: 2px solid var(--border-soft);
-    overflow: hidden;
-  }
-
-  .sidebar-header {
-    display: none;
-  }
-
-  .sidebar-instance {
-    flex: 1;
-    min-width: 0;
-    padding: 0.4rem 0.5rem;
-  }
-
-  .instance-icon {
-    width: 2.2rem;
-    height: 2.2rem;
-  }
-
-  .sidebar-footer {
-    flex-direction: row;
-    margin-top: 0;
-    padding: 0.4rem 0.75rem;
-    gap: 0.9rem;
-  }
-
   .version-entry {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -991,16 +944,6 @@
 
 /* telas muito pequenas */
 @media (max-width: 480px) {
-  .sidebar-footer a {
-    font-size: 0;
-    gap: 0;
-  }
-
-  .sidebar-footer a::before {
-    width: 0.9rem;
-    height: 0.9rem;
-  }
-
   .tab-btn {
     padding: 0.75rem 0.9rem 0.65rem;
     font-size: 0.85rem;
@@ -1043,10 +986,6 @@
 
 /* telas grandes: um pouco mais de espaço */
 @media (min-width: 1500px) {
-  .app-layout {
-    --sidebar-w: 280px;
-  }
-
   .page {
     max-width: 1100px;
   }

@@ -1,0 +1,155 @@
+/* Home redesign: carregado por último (depois de theme.css e overrides.css) */
+
+/* ---------- Navbar só com ícones ---------- */
+.tabs .tab-btn:first-child {
+  margin-left: 0 !important;
+}
+.tabs .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 0.9rem;
+  min-height: 44px;
+  margin: 0 !important; /* Remove qualquer margem entre abas */
+}
+.tabs {
+  padding-left: 0 !important; /* Remove padding inicial da navbar */
+  gap: 0 !important; /* Remove espaço entre botões */
+}
+.tab-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-family: var(--font-pixel);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--panel);
+  border: var(--border-width) solid var(--border);
+  border-radius: 2px;
+}
+.tab-btn.active .tab-number {
+  color: var(--play);
+  border-color: var(--play);
+  background: var(--play);
+  color: #1a1204;
+}
+
+/* ---------- Home: banner de largura total ---------- */
+.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+.home-page .hero {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  width: 100%;
+  height: clamp(340px, 58vh, 680px);
+  margin: 0;
+  padding: 0 clamp(1rem, 6vw, 6rem);
+  display: flex;
+  flex-direction: row;
+  align-items: center;       /* meio na vertical */
+  justify-content: center;   /* centralizado horizontalmente */
+  text-align: center;
+  border: 0;
+  border-bottom: var(--border-width) solid var(--border);
+  border-radius: 0;
+  text-align: center;        /* sobrescreve text-align: right do overrides.css */
+}
+.home-page .hero.empty {
+  justify-content: center;
+}
+
+/* conteúdo em cima do PixelBanner (ele exige z-index no conteúdo) */
+.home-page .hero-content {
+  position: relative;
+  z-index: 1;
+  width: min(22rem, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.home-page .hero-header {
+  display: flex;
+  flex-direction: column;   /* desfaz o column-reverse do overrides.css: logo em cima, badge embaixo */
+  align-items: center;
+  gap: 0.75rem;
+}
+.home-page .hero-title {
+  font-size: clamp(3.5rem, 7vw, 5.5rem);  /* maior que o atual */
+  line-height: 1;
+  text-shadow: 0.2rem 0.2rem 0 rgba(0, 0, 0, 0.45);
+}
+.home-page .hero-play-area {
+  display: flex;
+  flex-direction: column;   /* Play em cima, seletor embaixo */
+  align-items: center;      /* centralizado */
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+.home-page .hero-play-area .btn-play,
+.home-page .hero-play-area .version-selector,
+.home-page .hero-play-area .version-selector select {
+  width: 100%;
+}
+.home-page .launch-error {
+  margin: 0 auto;
+  max-width: 100%;
+}
+
+/* ---------- Parte de baixo ---------- */
+.home-lower {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem var(--gutter) 1rem;
+}
+.home-lower .card {
+  margin: 0;
+}
+.notes-summary-date {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+.notes-summary-body {
+  font-family: var(--font-text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-line;
+  margin-bottom: 0.9rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* rodapé (SidebarFooter) em linha, dentro da Home */
+.home-page .sf {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0;
+  padding: 0.5rem 0 0;
+}
+.home-page .sf-version {
+  padding: 0;
+}
+
+/* telas estreitas: conteúdo do banner centralizado */
+@media (max-width: 720px) {
+  .home-page .hero {
+    justify-content: center;
+    padding: 0 1rem;
+  }
+}

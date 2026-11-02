@@ -35,6 +35,8 @@ updateCloseGame: string;
   tabHome: string;
   tabVersions: string;
   tabNotes: string;
+  latestNotesTitle: string;
+  viewAllNotes: string;
   tabsLabel: string;
   instanceName: string;
   statusReady: string;

@@ -13,10 +13,10 @@ interface TabsProps {
 export function Tabs({ activeTab, onChange, hasNewVersions }: TabsProps) {
   const { t } = useI18n();
 
-  const tabs: { id: TabId; label: string }[] = [
-    { id: "home", label: t("tabHome") },
-    { id: "versions", label: t("tabVersions") },
-    { id: "notes", label: t("tabNotes") },
+  const tabs: { id: TabId; label: string; number: string }[] = [
+    { id: "home", label: t("tabHome"), number: "1" },
+    { id: "versions", label: t("tabVersions"), number: "2" },
+    { id: "notes", label: t("tabNotes"), number: "3" },
   ];
 
   return (
@@ -30,8 +30,10 @@ export function Tabs({ activeTab, onChange, hasNewVersions }: TabsProps) {
           id={`tab-${tab.id}`}
           className={`tab-btn ${activeTab === tab.id ? "active" : ""}`}
           onClick={() => onChange(tab.id)}
+          aria-label={tab.label}
+          title={tab.label}
         >
-          {tab.label}
+          <span className="tab-number">{tab.number}</span>
           {tab.id === "versions" && hasNewVersions && <span className="new-dot" aria-label="New versions available" />}
         </button>
       ))}

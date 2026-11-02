@@ -6,6 +6,7 @@ import { initI18n } from "./i18n";
 import "@fontsource/silkscreen";
 import "./theme.css";
 import "./overrides.css";
+import "./home-layout.css";
 
 initI18n();
 

@@ -32,6 +32,8 @@
   "tabHome": "Главная",
   "tabVersions": "Версии",
   "tabNotes": "Список изменений",
+  "latestNotesTitle": "Примечания к последней версии",
+  "viewAllNotes": "Показать все",
   "tabsLabel": "Основные вкладки",
   "instanceName": "Weft",
   "statusReady": "Готово",

@@ -33,6 +33,8 @@
   "tabHome": "Home",
   "tabVersions": "Versions",
   "tabNotes": "Release Notes",
+  "latestNotesTitle": "Latest release notes",
+  "viewAllNotes": "View all",
   "tabsLabel": "Main tabs",
   "instanceName": "Weft",
   "statusReady": "Ready",

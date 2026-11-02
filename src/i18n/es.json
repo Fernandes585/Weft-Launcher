@@ -32,6 +32,8 @@
   "tabHome": "Inicio",
   "tabVersions": "Versiones",
   "tabNotes": "Notas de versión",
+  "latestNotesTitle": "Notas de la última versión",
+  "viewAllNotes": "Ver todas",
   "tabsLabel": "Pestañas principales",
   "instanceName": "Weft",
   "statusReady": "Listo",

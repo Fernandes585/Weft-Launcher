@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "./i18n/useI18n";
-import { Sidebar } from "./components/Sidebar";
 import { Tabs } from "./components/Tabs";
 import { Home } from "./pages/Home";
 import { VersionsPage } from "./pages/Versions";
@@ -65,7 +64,14 @@ function App() {
   const renderPage = () => {
     switch (activeTab) {
       case "home":
-        return <Home onGoToVersions={() => setActiveTab("versions")} latestTag={latestTag} />;
+        return (
+          <Home
+            onGoToVersions={() => setActiveTab("versions")}
+            onGoToNotes={() => setActiveTab("notes")}
+            latestTag={latestTag}
+            releases={releases}
+          />
+        );
       case "versions":
         return (
           <VersionsPage
@@ -87,7 +93,6 @@ function App() {
 
   return (
     <div className="app-layout">
-      <Sidebar />
       <div className="main-content">
         <Tabs activeTab={activeTab} onChange={setActiveTab} hasNewVersions={hasNewVersions} />
         <div className="page-container" role="main">
