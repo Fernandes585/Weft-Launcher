@@ -354,7 +354,6 @@ pub async fn install_version(
     // On Unix, set executable permission on the binary before finalizing
     #[cfg(unix)]
     {
-        use std::fs::Permissions;
         let mut perms = fs::metadata(&temp_executable).await?.permissions();
         perms.set_mode(0o755);
         if let Err(e) = fs::set_permissions(&temp_executable, perms).await {
@@ -738,13 +737,12 @@ async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(
         let mut entries_to_move = Vec::new();
         let mut entries = fs::read_dir(&staging).await?;
         while let Some(entry) = entries.next_entry().await? {
-            // Get metadata from DirEntry directly (more reliable on Windows)
-            let metadata = entry.metadata().await.ok();
-            entries_to_move.push((entry.file_name(), metadata));
+            entries_to_move.push(entry);
         }
         drop(entries);
 
-        for (file_name, metadata) in entries_to_move {
+        for entry in entries_to_move {
+            let file_name = entry.file_name();
             let source = staging.join(&file_name);
             let target = extract_dir.join(&file_name);
             // On Windows, remove target first if it exists (rename fails if target exists)
@@ -758,8 +756,11 @@ async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(
             // On Windows, rename can fail for files; use copy+remove as fallback
             #[cfg(windows)]
             {
-                let is_file = metadata
-                    .as_ref()
+                // DirEntry metadata is more reliable than path metadata right
+                // after extraction on Windows.
+                let is_file = entry
+                    .metadata()
+                    .await
                     .map(|m| m.file_type().is_file())
                     .unwrap_or(false);
                 if is_file {
