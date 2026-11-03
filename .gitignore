@@ -39,4 +39,5 @@ logs
 .\.scripts\
 
 .scripts/
-scripts/
+scripts/*
+!scripts/check-i18n.mjs
