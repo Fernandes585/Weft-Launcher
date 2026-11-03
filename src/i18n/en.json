@@ -89,6 +89,7 @@
     "processSpawnFailed": "Failed to spawn process: {0}",
     "logDirCreateFailed": "Failed to create log directory: {0}",
     "gameFolderNotFound": "Game folder not found: {0}",
+    "gameFolderPathNotFound": "Game folder path not found in log: {0}",
     "unsupportedPlatform": "Game folder location not confirmed on this platform",
     "openerError": "Failed to open: {0}",
     "noCompatibleVersions": "No Weft versions available for your system."

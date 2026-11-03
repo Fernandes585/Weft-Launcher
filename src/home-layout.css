@@ -8,7 +8,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.6rem 0.9rem;
+  padding: 0.4rem 0.8rem;
   min-height: 44px;
   margin: 0 !important; /* Remove qualquer margem entre abas */
 }
@@ -22,19 +22,14 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  font-family: var(--font-pixel);
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text);
-  background: var(--panel);
-  border: var(--border-width) solid var(--border);
-  border-radius: 2px;
 }
-.tab-btn.active .tab-number {
-  color: var(--play);
-  border-color: var(--play);
-  background: var(--play);
-  color: #1a1204;
+.tab-number img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  mix-blend-mode: lighten;
 }
 
 /* ---------- Home: banner de largura total ---------- */
@@ -84,8 +79,9 @@
   gap: 0.75rem;
 }
 .home-page .hero-title {
-  font-size: clamp(3.5rem, 7vw, 5.5rem);  /* maior que o atual */
+  font-size: clamp(3.5rem, 7vw, 5.5rem);
   line-height: 1;
+  letter-spacing: 0;
   text-shadow: 0.2rem 0.2rem 0 rgba(0, 0, 0, 0.45);
 }
 .home-page .hero-play-area {
@@ -96,10 +92,16 @@
   gap: 0.75rem;
   width: 100%;
 }
-.home-page .hero-play-area .btn-play,
-.home-page .hero-play-area .version-selector,
-.home-page .hero-play-area .version-selector select {
+.home-page .hero-play-area,
+.home-page .hero-play-area,
+.home-page .hero-play-area select {
   width: 100%;
+}
+.btn-play{
+  width: 90%;
+}
+.version-selector{
+  width: 90%;
 }
 .home-page .launch-error {
   margin: 0 auto;
@@ -110,8 +112,8 @@
 .home-lower {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: 1.25rem var(--gutter) 1rem;
+  gap: 0.75rem;
+  padding: 1.5rem var(--gutter) 0rem;
 }
 .home-lower .card {
   margin: 0;

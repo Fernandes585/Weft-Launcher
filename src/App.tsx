@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "./i18n/useI18n";
+import { useInstall } from "./hooks/useInstall";
 import { Tabs } from "./components/Tabs";
 import { Home } from "./pages/Home";
 import { VersionsPage } from "./pages/Versions";
@@ -29,14 +30,23 @@ type TabId = "home" | "versions" | "notes";
 
 function App() {
   const { t, ready } = useI18n();
+  const { installedVersions } = useInstall();
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("home");
-  const [hasNewVersions, setHasNewVersions] = useState(false);
+  const pageContainerRef = useRef<HTMLDivElement>(null);
 
   const latestTag = useMemo(() => getLatestTag(releases), [releases]);
+
+  // Compute hasNewVersions: true if there's a latest release and it's not installed
+  // Shows green dot even when no versions are installed (fresh install case)
+  const hasNewVersions = useMemo(() => {
+    if (!latestTag) return false;
+    const isLatestInstalled = installedVersions.some((v) => v.tag === latestTag);
+    return !isLatestInstalled;
+  }, [latestTag, installedVersions]);
 
   async function fetchReleases(forceRefresh = false) {
     setLoading(true);
@@ -57,6 +67,13 @@ function App() {
     fetchReleases(false);
   }, []);
 
+  // Every section starts at the top when it is shown.
+  useLayoutEffect(() => {
+    if (pageContainerRef.current) {
+      pageContainerRef.current.scrollTop = 0;
+    }
+  }, [activeTab]);
+
   if (!ready) {
     return <div className="loading-screen">{t('loading')}</div>;
   }
@@ -67,9 +84,7 @@ function App() {
         return (
           <Home
             onGoToVersions={() => setActiveTab("versions")}
-            onGoToNotes={() => setActiveTab("notes")}
             latestTag={latestTag}
-            releases={releases}
           />
         );
       case "versions":
@@ -80,7 +95,6 @@ function App() {
             error={error}
             fromCache={fromCache}
             onRefresh={fetchReleases}
-            onNewVersionsChange={setHasNewVersions}
             latestTag={latestTag}
           />
         );
@@ -95,7 +109,7 @@ function App() {
     <div className="app-layout">
       <div className="main-content">
         <Tabs activeTab={activeTab} onChange={setActiveTab} hasNewVersions={hasNewVersions} />
-        <div className="page-container" role="main">
+        <div className="page-container" role="main" ref={pageContainerRef}>
           {renderPage()}
         </div>
       </div>

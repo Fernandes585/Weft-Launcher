@@ -1,9 +1,29 @@
 
 :root {
+  /* Font overrides (system fonts instead of Pixelify Sans) */
   --font-heading: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-label: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-pixel: 'Silkscreen', ui-monospace, monospace;
+
+  /* Alternative color theme (amber) - used when this stylesheet loads last */
+  --bg: #0a0e17;
+  --content-bg: #0d121d;
+  --panel: #151b2b;
+  --panel-lighter: #1d2539;
+  --border: #2b3550;
+  --border-soft: #222b42;
+  --text: #eef1f8;
+  --text-dim: #9aa4bd;
+
+  --accent: #f5a524;
+  --primary: #e8920f;
+  --primary-hover: #f5a524;
+  --primary-active: #c97a08;
+  --play: #e8920f;
+  --play-hover: #f5a524;
+  --play-edge: #ffc65c;
+  --play-shadow: #9a5d06;
 }
 
 
@@ -247,14 +267,6 @@ textarea {
 .install-btn {
   color: #1a1204 !important;
 }
-
-.pb-shade {
-  background:
-    linear-gradient(270deg, rgba(10, 14, 23, 0.62) 0%, rgba(10, 14, 23, 0.22) 45%, transparent 75%),
-    linear-gradient(0deg, rgba(10, 14, 23, 0.35), transparent 40%);
-}
-
-
 
 .tabs-right {
   margin-left: auto;

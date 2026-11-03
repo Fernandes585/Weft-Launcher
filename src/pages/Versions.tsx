@@ -25,7 +25,6 @@ interface VersionsPageProps {
   error: string | null;
   fromCache: boolean;
   onRefresh: (forceRefresh?: boolean) => void;
-  onNewVersionsChange?: (hasNew: boolean) => void;
   latestTag: string | null;
 }
 
@@ -35,27 +34,17 @@ export function VersionsPage({
   error,
   fromCache,
   onRefresh,
-  onNewVersionsChange,
   latestTag,
 }: VersionsPageProps) {
   const { t, formatSize: fmtSize } = useI18n();
-  const { installedVersions, refreshInstalled } = useInstall();
+  const { installedVersions } = useInstall();
 
   const installedMap = new Map(installedVersions.map((v) => [v.tag, v]));
 
-  // NEW badge logic: show ONLY on the release whose tag === latestTag,
-  // AND only if latestTag is NOT installed AND there's at least one other installed version
-  const hasInstalledVersions = installedVersions.length > 0;
+  // NEW badge logic: show on the latest release if it's not installed
+  // Works even when no versions are installed (fresh install case)
   const isLatestInstalled = latestTag ? installedMap.has(latestTag) : false;
-  const showNewBadgeOnTag = latestTag && !isLatestInstalled && hasInstalledVersions ? latestTag : null;
-
-  // Compute if there are any new versions (for the tab indicator)
-  const hasNewVersions = releases.some((r) => r.tag === showNewBadgeOnTag);
-
-  // Notify parent about new versions state change
-  if (onNewVersionsChange) {
-    onNewVersionsChange(hasNewVersions);
-  }
+  const showNewBadgeOnTag = latestTag && !isLatestInstalled ? latestTag : null;
 
   const sortedReleases = [...releases].sort((a, b) =>
     new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
@@ -128,8 +117,6 @@ export function VersionsPage({
                       sha256: asset.sha256,
                     },
                   }}
-                  installedVersion={installedVersion}
-                  onInstallComplete={refreshInstalled}
                 />
               </article>
             );

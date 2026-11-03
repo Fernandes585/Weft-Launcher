@@ -3,7 +3,7 @@ use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::File as StdFile;
-use std::io::{ErrorKind, Read, Write};
+use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
 use tauri::{Emitter, Manager};
 use thiserror::Error;
@@ -15,38 +15,14 @@ use zip::result::ZipError;
 use std::os::unix::fs::PermissionsExt;
 
 // Import from launch module to check running versions
+use crate::config::USER_AGENT_VALUE;
 use crate::launch::is_version_running;
 use crate::error::AppError;
 
 /// Returns the platform-specific executable name for Weft.
 pub fn executable_name() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "weft.exe"
-    } else {
-        "weft"
-    }
+    if cfg!(target_os = "windows") { "weft.exe" } else { "weft" }
 }
-
-/// Logs an error to launcher.log in the app data directory.
-async fn log_error(app_handle: &tauri::AppHandle, stage: &str, err: &std::io::Error) {
-    if let Ok(app_data) = app_handle.path().app_data_dir() {
-        let log_path = app_data.join("launcher.log");
-        let timestamp = time::OffsetDateTime::now_utc()
-            .format(&time::format_description::well_known::Rfc3339)
-            .unwrap_or_default();
-        let log_entry = format!("[{}] [{}] {}\n", timestamp, stage, err);
-        if let Ok(mut file) = tokio::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path)
-            .await
-        {
-            let _ = file.write_all(log_entry.as_bytes()).await;
-        }
-    }
-}
-
-const USER_AGENT_VALUE: &str = "weft-launcher/0.1.0";
 
 #[derive(Debug, Error)]
 pub enum InstallError {
@@ -337,13 +313,13 @@ pub async fn install_version(
     };
 
     if let Err(e) = &extract_result {
-        log_error(&app_handle, "extracting", &std::io::Error::other(e.to_string())).await;
-    }
-    extract_result?;
+            eprintln!("Extract error: {}", e);
+        }
+        extract_result?;
 
     // Normalize structure (handle top-level folder)
     if let Err(e) = normalize_install_structure(&temp_extract, &tag).await {
-        log_error(&app_handle, "normalizing", &std::io::Error::other(e.to_string())).await;
+            eprintln!("Normalize error: {}", e);
         return Err(e.into());
     }
 
@@ -382,7 +358,7 @@ pub async fn install_version(
         let mut perms = fs::metadata(&temp_executable).await?.permissions();
         perms.set_mode(0o755);
         if let Err(e) = fs::set_permissions(&temp_executable, perms).await {
-            log_error(&app_handle, "setting permissions", &e).await;
+            eprintln!("Permission error: {}", e);
             cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
             return Err(InstallError::ExtractFailed(format!(
                 "Falha ao definir permissão de execução: {}",
@@ -417,7 +393,7 @@ pub async fn install_version(
             // Remove temp dir
             fs::remove_dir_all(&temp_extract).await?;
         } else {
-            log_error(&app_handle, "finalizing (rename)", &e).await;
+            eprintln!("Rename error: {}", e);
             cleanup_temp(temp_download.clone(), temp_extract.clone()).await;
             return Err(e.into());
         }
@@ -466,115 +442,113 @@ pub async fn install_version(
 
 async fn extract_zip(zip_path: PathBuf, dest: PathBuf) -> Result<(), InstallError> {
     // Run extraction in blocking task to avoid Send issues with zip crate types
-    tokio::task::spawn_blocking(move || -> Result<(), InstallError> {
-        let file = StdFile::open(&zip_path)?;
-        let mut archive = zip::ZipArchive::new(file)?;
+    tokio::task::spawn_blocking(move || extract_zip_blocking(&zip_path, &dest))
+        .await
+        .map_err(|e| {
+            InstallError::ExtractFailed(format!(
+                "extraction task failed: {}",
+                build_error_chain(&e)
+            ))
+        })?
+}
 
-        let mut extracted_count = 0;
+fn extract_zip_blocking(zip_path: &Path, dest: &Path) -> Result<(), InstallError> {
+    let file = StdFile::open(zip_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
 
-        for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)?;
+    let mut extracted_count = 0;
 
-            // Use enclosed_name() which returns None if path tries to escape
-            let Some(entry_path) = entry.enclosed_name() else {
-                return Err(InstallError::ExtractFailed(
-                    "entrada insegura no arquivo (zip-slip)".to_string(),
-                ));
-            };
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)?;
 
-            // Reject absolute paths, Windows prefixes, and parent directory components
-            if entry_path.components().any(|c| {
-                matches!(
-                    c,
-                    Component::RootDir | Component::Prefix(_) | Component::ParentDir
-                )
-            }) {
-                return Err(InstallError::ExtractFailed(
-                    "entrada insegura no arquivo".to_string(),
-                ));
-            }
-
-            let target_path = dest.join(entry_path);
-
-            if entry.is_dir() {
-                std::fs::create_dir_all(&target_path)?;
-            } else {
-                if let Some(parent) = target_path.parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-                let mut outfile = StdFile::create(&target_path)?;
-                std::io::copy(&mut entry, &mut outfile)?;
-            }
-            extracted_count += 1;
-        }
-
-        if extracted_count == 0 {
+        // Use enclosed_name() which returns None if path tries to escape
+        let Some(entry_path) = entry.enclosed_name() else {
             return Err(InstallError::ExtractFailed(
-                "nenhum arquivo extraído (arquivo vazio ou todas as entradas inseguras)"
-                    .to_string(),
+                "entrada insegura no arquivo (zip-slip)".to_string(),
+            ));
+        };
+
+        if !is_safe_archive_path(entry_path) {
+            return Err(InstallError::ExtractFailed(
+                "entrada insegura no arquivo".to_string(),
             ));
         }
 
-        Ok(())
-    })
-    .await
-    .map_err(|e| InstallError::ExtractFailed(e.to_string()))?
+        let target_path = dest.join(entry_path);
+
+        if entry.is_dir() {
+            std::fs::create_dir_all(&target_path)?;
+        } else {
+            if let Some(parent) = target_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let mut outfile = StdFile::create(&target_path)?;
+            std::io::copy(&mut entry, &mut outfile)?;
+        }
+        extracted_count += 1;
+    }
+
+    if extracted_count == 0 {
+        return Err(InstallError::ExtractFailed(
+            "nenhum arquivo extraído (arquivo vazio ou todas as entradas inseguras)".to_string(),
+        ));
+    }
+
+    Ok(())
 }
 
-/// Normalize an entry path from the tar archive:
-/// - Reject absolute paths and paths containing ".." components
-/// - Strip leading "./" if present
-/// - Strip top-level "Weft/" directory if present
-///
-/// Returns None if the entry should be skipped (e.g., symlinks, invalid paths)
-fn normalize_entry_path(entry_path: &Path) -> Option<PathBuf> {
-    // Reject absolute paths
-    if entry_path.is_absolute() {
-        return None;
-    }
+/// Rejects absolute paths and any `..`, root, or Windows prefix component
+/// before anything is written to disk.
+fn is_safe_archive_path(path: &Path) -> bool {
+    !path.is_absolute()
+        && !path.components().any(|c| {
+            matches!(
+                c,
+                Component::RootDir | Component::Prefix(_) | Component::ParentDir
+            )
+        })
+}
 
-    // Check for path traversal components
-    for component in entry_path.components() {
+/// Lexically resolves a link target and checks that it cannot leave the
+/// extraction root. No `canonicalize` (and therefore no symlink following).
+fn link_target_stays_inside(link_path: &Path, target: &Path, relative_to_root: bool) -> bool {
+    let mut depth = if relative_to_root {
+        0i32
+    } else {
+        link_path
+            .parent()
+            .map(|p| {
+                p.components()
+                    .filter(|c| matches!(c, Component::Normal(_)))
+                    .count() as i32
+            })
+            .unwrap_or(0)
+    };
+
+    for component in target.components() {
         match component {
-            Component::ParentDir => return None, // ".."
-            Component::RootDir => return None,   // absolute (redundant but safe)
-            Component::Prefix(_) => return None, // Windows prefix
-            _ => {}
+            Component::Normal(_) => depth += 1,
+            Component::CurDir => {}
+            Component::ParentDir => {
+                depth -= 1;
+                if depth < 0 {
+                    return false;
+                }
+            }
+            Component::RootDir | Component::Prefix(_) => return false,
         }
     }
+    true
+}
 
-    let mut path = entry_path.to_path_buf();
-
-    // Strip leading "./" if present
-    if path.starts_with(".") {
-        path = path.strip_prefix(".").unwrap_or(&path).to_path_buf();
-        // Strip leading separator if present
-        if let Some(first) = path.components().next()
-            && matches!(first, Component::RootDir)
-        {
-            path = path.strip_prefix(first.as_os_str()).unwrap_or(&path).to_path_buf();
-        }
-    }
-
-    // Strip top-level "Weft/" directory if present
-    if let Some(Component::Normal(name)) = path.components().next()
-        && name == "Weft"
-    {
-        path = path.strip_prefix("Weft").unwrap_or(&path).to_path_buf();
-        // Strip leading separator if present
-        if let Some(first) = path.components().next()
-            && matches!(first, Component::RootDir)
-        {
-            path = path.strip_prefix(first.as_os_str()).unwrap_or(&path).to_path_buf();
-        }
-    }
-
-    // Skip empty paths (can happen if archive only had "Weft/" directory entry)
-    if path.as_os_str().is_empty() {
-        return None;
-    }
-
-    Some(path)
+/// macOS archives often carry `__MACOSX/` folders and `._*` resource forks.
+fn is_macos_metadata(path: &Path) -> bool {
+    path.components()
+        .any(|c| matches!(c, Component::Normal(name) if name == "__MACOSX"))
+        || path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("._"))
 }
 
 /// Build a full error chain message from an error and its sources.
@@ -591,146 +565,148 @@ fn build_error_chain(err: &dyn std::error::Error) -> String {
 
 async fn extract_tar_gz(tar_gz_path: PathBuf, dest: PathBuf) -> Result<(), InstallError> {
     // Run extraction in blocking task to avoid Send issues with tar crate types
-    tokio::task::spawn_blocking(move || -> Result<(), InstallError> {
-        let file = StdFile::open(&tar_gz_path)
-            .map_err(|e| InstallError::ExtractFailed(format!("failed to open archive: {}", build_error_chain(&e))))?;
-        let decoder = flate2::read::MultiGzDecoder::new(file);
-        let mut archive = tar::Archive::new(decoder);
+    tokio::task::spawn_blocking(move || extract_tar_gz_blocking(&tar_gz_path, &dest))
+        .await
+        .map_err(|e| {
+            InstallError::ExtractFailed(format!(
+                "extraction task failed: {}",
+                build_error_chain(&e)
+            ))
+        })?
+}
 
-        let mut extracted_count = 0;
+fn extract_tar_gz_blocking(tar_gz_path: &Path, dest: &Path) -> Result<(), InstallError> {
+    let file = StdFile::open(tar_gz_path).map_err(|e| {
+        InstallError::ExtractFailed(format!(
+            "failed to open `{}`: {}",
+            tar_gz_path.display(),
+            build_error_chain(&e)
+        ))
+    })?;
+    let decoder = flate2::read::MultiGzDecoder::new(file);
+    let mut archive = tar::Archive::new(decoder);
+    archive.set_preserve_permissions(true);
 
-        for entry_result in archive.entries()? {
-            let mut entry = entry_result
-                .map_err(|e| InstallError::ExtractFailed(format!("failed to read tar entry: {}", build_error_chain(&e))))?;
+    let mut extracted_count = 0;
 
-            let entry_path = entry.path()
-                .map_err(|e| InstallError::ExtractFailed(format!("failed to get entry path: {}", build_error_chain(&e))))?;
+    // gzip input is not seekable: each entry must be consumed while the
+    // iterator still owns it. Never collect entries into a Vec first.
+    for entry_result in archive.entries()? {
+        let mut entry = entry_result.map_err(|e| {
+            InstallError::ExtractFailed(format!(
+                "failed to read tar entry: {}",
+                build_error_chain(&e)
+            ))
+        })?;
 
-            // Normalize path (handles path traversal, strips Weft/ prefix, etc.)
-            let normalized_path = match normalize_entry_path(&entry_path) {
-                Some(p) => p,
-                None => {
-                    // Log skipped entries (symlinks, invalid paths, etc.)
-                    eprintln!("Skipping tar entry: {:?} (invalid or symlink)", entry_path);
-                    continue;
-                }
-            };
+        let entry_path = entry
+            .path()
+            .map_err(|e| {
+                InstallError::ExtractFailed(format!(
+                    "failed to read entry path: {}",
+                    build_error_chain(&e)
+                ))
+            })?
+            .into_owned();
 
-            let target_path = dest.join(&normalized_path);
-            let entry_type = entry.header().entry_type();
-
-            if entry_type.is_dir() {
-                // Create directory
-                std::fs::create_dir_all(&target_path)
-                    .map_err(|e| InstallError::ExtractFailed(format!(
-                        "failed to create directory {}: {}",
-                        target_path.display(),
-                        build_error_chain(&e)
-                    )))?;
-            } else if entry_type.is_file() {
-                // Regular file: ensure parent dir exists, then copy
-                if let Some(parent) = target_path.parent() {
-                    std::fs::create_dir_all(parent)
-                        .map_err(|e| InstallError::ExtractFailed(format!(
-                            "failed to create parent directory for {}: {}",
-                            target_path.display(),
-                            build_error_chain(&e)
-                        )))?;
-                }
-
-                let mut outfile = StdFile::create(&target_path)
-                    .map_err(|e| InstallError::ExtractFailed(format!(
-                        "failed to create file {}: {}",
-                        target_path.display(),
-                        build_error_chain(&e)
-                    )))?;
-
-                let expected_size = entry.header().size()
-                    .map_err(|e| InstallError::ExtractFailed(format!(
-                        "failed to get entry size for {}: {}",
-                        target_path.display(),
-                        build_error_chain(&e)
-                    )))?;
-
-                let mut bytes_copied = 0u64;
-                {
-                    let entry_reader = entry.by_ref();
-                    let mut buffer = [0u8; 8192];
-                    loop {
-                        let n = entry_reader.read(&mut buffer)
-                            .map_err(|e| InstallError::ExtractFailed(format!(
-                                "failed to read entry data for {}: {}",
-                                target_path.display(),
-                                build_error_chain(&e)
-                            )))?;
-                        if n == 0 {
-                            break;
-                        }
-                        outfile.write_all(&buffer[..n])
-                            .map_err(|e| InstallError::ExtractFailed(format!(
-                                "failed to write to {}: {}",
-                                target_path.display(),
-                                build_error_chain(&e)
-                            )))?;
-                        bytes_copied += n as u64;
-                    }
-                }
-
-                outfile.flush()
-                    .map_err(|e| InstallError::ExtractFailed(format!(
-                        "failed to flush {}: {}",
-                        target_path.display(),
-                        build_error_chain(&e)
-                    )))?;
-
-                // Verify we copied the expected amount
-                if bytes_copied != expected_size {
-                    return Err(InstallError::ExtractFailed(format!(
-                        "truncated file {}: expected {} bytes, got {}",
-                        target_path.display(),
-                        expected_size,
-                        bytes_copied
-                    )));
-                }
-
-                // Set permissions on Unix
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    let mode = entry.header().mode()
-                        .map_err(|e| InstallError::ExtractFailed(format!(
-                            "failed to get entry mode for {}: {}",
-                            target_path.display(),
-                            build_error_chain(&e)
-                        )))?;
-                    let perm = std::fs::Permissions::from_mode((mode & 0o777).max(0o644));
-                    std::fs::set_permissions(&target_path, perm)
-                        .map_err(|e| InstallError::ExtractFailed(format!(
-                            "failed to set permissions on {}: {}",
-                            target_path.display(),
-                            build_error_chain(&e)
-                        )))?;
-                }
-
-            } else {
-                // Skip symlinks, hardlinks, char devices, block devices, fifos, etc.
-                eprintln!("Skipping tar entry: {:?} (type: {:?})", entry_path, entry_type);
-                continue;
-            }
-
-            extracted_count += 1;
+        if is_macos_metadata(&entry_path) {
+            continue;
         }
 
-        if extracted_count == 0 {
+        if !is_safe_archive_path(&entry_path) {
             return Err(InstallError::ExtractFailed(
-                "no files extracted (archive empty or all entries unsafe)".to_string(),
+                "entrada insegura no arquivo".to_string(),
             ));
         }
 
-        Ok(())
-    })
-    .await
-    .map_err(|e| InstallError::ExtractFailed(format!("extraction task failed: {}", build_error_chain(&e))))?
+        let entry_type = entry.header().entry_type();
+
+        if entry_type.is_dir() || entry_type.is_file() {
+            let unpacked = entry.unpack_in(dest).map_err(|e| {
+                InstallError::ExtractFailed(format!(
+                    "failed to unpack `{}`: {}",
+                    entry_path.display(),
+                    build_error_chain(&e)
+                ))
+            })?;
+            if !unpacked {
+                return Err(InstallError::ExtractFailed(
+                    "entrada insegura no arquivo".to_string(),
+                ));
+            }
+            extracted_count += 1;
+            continue;
+        }
+
+        if entry_type.is_symlink() || entry_type.is_hard_link() {
+            let target = entry
+                .link_name()
+                .map_err(|e| {
+                    InstallError::ExtractFailed(format!(
+                        "failed to read link target of `{}`: {}",
+                        entry_path.display(),
+                        build_error_chain(&e)
+                    ))
+                })?
+                .ok_or_else(|| {
+                    InstallError::ExtractFailed(format!(
+                        "link entry `{}` has no target",
+                        entry_path.display()
+                    ))
+                })?;
+
+            let stays_inside = if entry_type.is_symlink() {
+                link_target_stays_inside(&entry_path, &target, false)
+            } else {
+                link_target_stays_inside(&entry_path, &target, true)
+            };
+
+            if !stays_inside {
+                return Err(InstallError::ExtractFailed(format!(
+                    "entrada insegura no arquivo: link `{}` aponta para `{}`",
+                    entry_path.display(),
+                    target.display()
+                )));
+            }
+
+            let unpacked = entry.unpack_in(dest).map_err(|e| {
+                InstallError::ExtractFailed(format!(
+                    "failed to unpack link `{}`: {}",
+                    entry_path.display(),
+                    build_error_chain(&e)
+                ))
+            })?;
+            if !unpacked {
+                return Err(InstallError::ExtractFailed(
+                    "entrada insegura no arquivo".to_string(),
+                ));
+            }
+            extracted_count += 1;
+        }
+        // Device nodes, FIFOs and extension headers are not part of the game
+        // assets and are ignored.
+    }
+
+    if extracted_count == 0 {
+        return Err(InstallError::ExtractFailed(
+            "no files extracted (archive empty or all entries unsafe)".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Returns an unused sibling path used to temporarily rename the top-level
+/// folder while its contents are lifted to the extraction root.
+fn unique_staging_dir(extract_dir: &Path) -> PathBuf {
+    let mut counter = 0u32;
+    loop {
+        let candidate = extract_dir.join(format!(".normalize-{}-{}", std::process::id(), counter));
+        if !candidate.exists() {
+            return candidate;
+        }
+        counter += 1;
+    }
 }
 
 async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(), InstallError> {
@@ -745,29 +721,32 @@ async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(
             first_entry = Some(entry.path());
         }
     }
+    drop(entries);
 
     // If there's exactly one folder at root, move its contents up
     if entry_count == 1
         && let Some(single_dir) = first_entry
         && single_dir.is_dir()
     {
+        // Rename the folder before moving anything: on case-insensitive
+        // filesystems (default macOS/Windows) a child such as `weft` would
+        // otherwise resolve to the folder itself (`Weft/`).
+        let staging = unique_staging_dir(extract_dir);
+        fs::rename(&single_dir, &staging).await?;
+
         // Collect entries first to avoid concurrent modification issues
         let mut entries_to_move = Vec::new();
-        let mut entries = fs::read_dir(&single_dir).await?;
+        let mut entries = fs::read_dir(&staging).await?;
         while let Some(entry) = entries.next_entry().await? {
             // Get metadata from DirEntry directly (more reliable on Windows)
             let metadata = entry.metadata().await.ok();
-            entries_to_move.push((entry, metadata));
+            entries_to_move.push((entry.file_name(), metadata));
         }
-        for (entry, metadata) in entries_to_move {
-            let source = entry.path();
-            let target = extract_dir.join(entry.file_name());
-            eprintln!("Normalize: moving {:?} -> {:?}", source, target);
-            // Ensure source exists
-            if !source.exists() {
-                eprintln!("Source does not exist, skipping");
-                continue;
-            }
+        drop(entries);
+
+        for (file_name, metadata) in entries_to_move {
+            let source = staging.join(&file_name);
+            let target = extract_dir.join(&file_name);
             // On Windows, remove target first if it exists (rename fails if target exists)
             if target.exists() {
                 if target.is_dir() {
@@ -776,28 +755,25 @@ async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(
                     fs::remove_file(&target).await?;
                 }
             }
-            eprintln!("  About to rename...");
             // On Windows, rename can fail for files; use copy+remove as fallback
             #[cfg(windows)]
             {
-                let is_file = metadata.as_ref().map(|m| m.file_type().is_file()).unwrap_or(false);
-                eprintln!("  Windows branch, is_file={}", is_file);
+                let is_file = metadata
+                    .as_ref()
+                    .map(|m| m.file_type().is_file())
+                    .unwrap_or(false);
                 if is_file {
-                    eprintln!("  Trying copy...");
                     // On Windows, file might not be immediately accessible after tar extraction
                     // Retry a few times
                     let mut last_err = None;
-                    for attempt in 0..5 {
+                    for _attempt in 0..5 {
                         match fs::copy(&source, &target).await {
                             Ok(_) => {
-                                eprintln!("  Copy succeeded on attempt {}", attempt + 1);
                                 last_err = None;
                                 break;
                             }
                             Err(e) => {
-                                let err_msg = e.to_string();
                                 last_err = Some(e);
-                                eprintln!("  Copy attempt {} failed: {}, retrying...", attempt + 1, err_msg);
                                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                             }
                         }
@@ -805,23 +781,17 @@ async fn normalize_install_structure(extract_dir: &Path, _tag: &str) -> Result<(
                     if let Some(e) = last_err {
                         return Err(e.into());
                     }
-                    eprintln!("  Copy succeeded, removing source...");
                     fs::remove_file(&source).await?;
-                    eprintln!("  Copy+remove succeeded");
                 } else {
                     fs::rename(&source, &target).await?;
-                    eprintln!("  Rename succeeded");
                 }
             }
             #[cfg(not(windows))]
             {
                 fs::rename(&source, &target).await?;
-                eprintln!("  Rename succeeded");
             }
         }
-        eprintln!("Removing single_dir: {:?}", single_dir);
-        fs::remove_dir(single_dir).await?;
-        eprintln!("remove_dir succeeded");
+        fs::remove_dir(&staging).await?;
     }
     // If there are multiple entries or a single file at root, that's fine - already normalized
 
@@ -918,3 +888,7 @@ pub async fn remove_version(app_handle: tauri::AppHandle, tag: String) -> Result
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
+

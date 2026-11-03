@@ -89,6 +89,7 @@
     "processSpawnFailed": "Falha ao iniciar processo: {0}",
     "logDirCreateFailed": "Falha ao criar diretório de logs: {0}",
     "gameFolderNotFound": "Pasta do jogo não encontrada: {0}",
+    "gameFolderPathNotFound": "Caminho da pasta do jogo não encontrado no log: {0}",
     "unsupportedPlatform": "Localização da pasta do jogo não confirmada nesta plataforma",
     "openerError": "Falha ao abrir: {0}",
     "noCompatibleVersions": "Nenhuma versão do Weft disponível para o seu sistema."

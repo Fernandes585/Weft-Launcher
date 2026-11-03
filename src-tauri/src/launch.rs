@@ -252,54 +252,128 @@ pub async fn get_running_versions(app_handle: AppHandle) -> Result<Vec<String>, 
     Ok(map.keys().cloned().collect())
 }
 
-#[tauri::command]
-pub async fn open_game_folder(app_handle: AppHandle, _tag: String) -> Result<String, AppError> {
-    // Get app data directory
-    let app_data = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| LaunchError::OpenGameFolderError(format!("failed to get app data dir: {}", e)))?;
+fn default_game_folder() -> Result<PathBuf, LaunchError> {
+    let data_dir = dirs::data_dir().ok_or_else(|| {
+        LaunchError::OpenGameFolderError("could not determine the data directory".to_string())
+    })?;
 
-    // Create instances/default/run directory
-    let game_folder = app_data.clone();
-    fs::create_dir_all(&game_folder).await
-        .map_err(|e| LaunchError::OpenGameFolderError(format!("failed to create game folder: {}", e)))?;
-
-    // Try to open with tauri-plugin-opener first
-    let path_str = game_folder.to_string_lossy().to_string();
-    let open_result = app_handle
-        .opener()
-        .open_path(&path_str, None::<&str>);
-
-    match open_result {
-        Ok(_) => Ok(path_str),
-        Err(opener_err) => {
-            // On Linux, try xdg-open as fallback
-            #[cfg(target_os = "linux")]
-            {
-                let xdg_result = std::process::Command::new("xdg-open")
-                    .arg(&path_str)
-                    .status();
-                match xdg_result {
-                    Ok(status) if status.success() => return Ok(path_str),
-                    Ok(status) => {
-                        return Err(LaunchError::OpenGameFolderError(format!(
-                            "xdg-open failed with exit code: {:?}",
-                            status.code()
-                        )).into());
-                    }
-                    Err(e) => {
-                        return Err(LaunchError::OpenGameFolderError(format!(
-                            "both tauri opener and xdg-open failed: opener: {}, xdg-open: {}",
-                            opener_err, e
-                        )).into());
-                    }
-                }
+    if let Ok(entries) = std::fs::read_dir(&data_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if name.to_string_lossy().eq_ignore_ascii_case("weft") && entry.path().is_dir() {
+                return Ok(entry.path());
             }
-            // On non-Linux, return the opener error
-            Err(LaunchError::OpenGameFolderError(format!("failed to open folder: {}", opener_err)).into())
         }
     }
+
+    Ok(data_dir.join("Weft"))
+}
+
+async fn game_folder_from_log(app_handle: &AppHandle, tag: &str) -> Option<PathBuf> {
+    let logs_dir = get_logs_dir(app_handle).ok()?;
+    let log_file = logs_dir.join(format!("{}.log", tag));
+    if !log_file.exists() {
+        return None;
+    }
+    let log_content = fs::read_to_string(&log_file).await.ok()?;
+    extract_game_folder_from_log(&log_content).map(PathBuf::from)
+}
+
+async fn resolve_game_folder(app_handle: &AppHandle, tag: &str) -> Result<PathBuf, LaunchError> {
+    if let Some(path) = game_folder_from_log(app_handle, tag).await {
+        if path.is_dir() {
+            return Ok(path);
+        }
+        return Err(LaunchError::GameFolderNotFound(path.display().to_string()));
+    }
+
+    let fallback = default_game_folder()?;
+    if fallback.is_dir() {
+        Ok(fallback)
+    } else {
+        Err(LaunchError::GameFolderNotFound(fallback.display().to_string()))
+    }
+}
+
+#[tauri::command]
+pub async fn open_game_folder(app_handle: AppHandle, tag: String) -> Result<String, AppError> {
+    let game_folder = resolve_game_folder(&app_handle, &tag).await?;
+    let path_str = game_folder.to_string_lossy().to_string();
+
+    match app_handle.opener().open_path(&path_str, None::<&str>) {
+        Ok(_) => Ok(path_str),
+        Err(opener_err) => {
+            #[cfg(target_os = "linux")]
+            {
+                if open_folder_on_linux(&path_str) {
+                    return Ok(path_str);
+                }
+                return Err(LaunchError::OpenGameFolderError(format!(
+                    "could not open the game folder (tauri opener: {}; xdg-open, gio and kde-open failed)",
+                    opener_err
+                ))
+                .into());
+            }
+
+            #[cfg(not(target_os = "linux"))]
+            {
+                Err(LaunchError::OpenGameFolderError(format!(
+                    "failed to open the game folder: {}",
+                    opener_err
+                ))
+                .into())
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn open_folder_on_linux(path: &str) -> bool {
+    let attempts: [(&str, Vec<&str>); 3] = [
+        ("xdg-open", vec![path]),
+        ("gio", vec!["open", path]),
+        ("kde-open", vec![path]),
+    ];
+
+    for (program, args) in attempts {
+        if let Ok(status) = std::process::Command::new(program).args(&args).status()
+            && status.success()
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Weft logs its folders on startup: `[weft] game folder <path>, cache <path>`.
+fn extract_game_folder_from_log(log_content: &str) -> Option<String> {
+    const MARKER: &str = "game folder ";
+    let mut found = None;
+
+    for line in log_content.lines() {
+        let Some(index) = line.rfind(MARKER) else {
+            continue;
+        };
+        let rest = &line[index + MARKER.len()..];
+        let path = rest
+            .split(", cache")
+            .next()
+            .unwrap_or(rest)
+            .trim()
+            .trim_end_matches([',', '"', '\''])
+            .trim();
+        if !path.is_empty() {
+            found = Some(path.to_string());
+        }
+    }
+
+    found
+}
+
+#[tauri::command]
+pub async fn get_game_folder_path(app_handle: AppHandle, tag: String) -> Result<String, AppError> {
+    let path = resolve_game_folder(&app_handle, &tag).await?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]

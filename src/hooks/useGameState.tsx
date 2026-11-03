@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { translateError } from "../i18n/errors";
@@ -20,6 +20,7 @@ const GameStateContext = createContext<GameStateContextValue | null>(null);
 
 export function GameStateProvider({ children }: { children: ReactNode }) {
   const [runningTags, setRunningTags] = useState<Set<string>>(new Set());
+  const launchingTags = useRef<Set<string>>(new Set());
 
   const anyRunning = runningTags.size > 0;
 
@@ -66,20 +67,26 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const launch = useCallback(async (tag: string): Promise<string | null> => {
+    // Ignore clicks while the launch request for this tag is still in flight
+    if (launchingTags.current.has(tag)) {
+      return null;
+    }
+    launchingTags.current.add(tag);
+
     try {
       await invoke("launch_version", { tag });
       return null; // success
     } catch (err) {
       return translateError(err);
+    } finally {
+      launchingTags.current.delete(tag);
     }
   }, []);
 
-  const value: GameStateContextValue = {
-    runningTags,
-    anyRunning,
-    isRunning,
-    launch,
-  };
+  const value = useMemo<GameStateContextValue>(
+    () => ({ runningTags, anyRunning, isRunning, launch }),
+    [runningTags, anyRunning, isRunning, launch],
+  );
 
   return <GameStateContext.Provider value={value}>{children}</GameStateContext.Provider>;
 }

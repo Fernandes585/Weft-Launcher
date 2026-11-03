@@ -8,6 +8,7 @@
     "release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1",
     "dev": "vite",
     "build": "tsc && vite build",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

@@ -91,6 +91,7 @@ updateCloseGame: string;
     processSpawnFailed: string;
     logDirCreateFailed: string;
     gameFolderNotFound: string;
+    gameFolderPathNotFound: string;
     unsupportedPlatform: string;
     openerError: string;
     noCompatibleVersions: string;

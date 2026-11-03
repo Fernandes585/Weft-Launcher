@@ -1,7 +1,7 @@
 import { useI18n } from "../i18n/useI18n";
 import { useGameState } from "../hooks/useGameState";
 import { SidebarFooter } from "./SidebarFooter";
-import weftIcon from "../assets/weft.png";
+import weftIcon from "../assets/weft.webp";
 
 export function Sidebar() {
   const { t } = useI18n();

@@ -1,4 +1,4 @@
-use crate::config::WEFT_REPO;
+use crate::config::{USER_AGENT_VALUE, WEFT_REPO};
 use crate::error::AppError;
 use reqwest::header::{
     ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, InvalidHeaderValue, USER_AGENT,
@@ -10,7 +10,6 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use tokio::fs;
 
-const USER_AGENT_VALUE: &str = "weft-launcher/0.1.0";
 const GITHUB_API_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 #[derive(Debug, Error)]

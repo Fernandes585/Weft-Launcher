@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useI18n } from "../i18n/useI18n";
@@ -8,19 +8,13 @@ import { useGameState } from "../hooks/useGameState";
 import { PixelBanner } from "../components/PixelBanner";
 import { compareTags } from "../utils/version";
 import { SidebarFooter } from "../components/SidebarFooter";
-import { formatDate } from "../utils/date";
-import { summarizeNotes } from "../utils/notes";
 
 export function Home({
   onGoToVersions,
-  onGoToNotes,
   latestTag,
-  releases,
 }: {
   onGoToVersions: () => void;
-  onGoToNotes: () => void;
   latestTag: string | null;
-  releases: { tag: string; published_at: string; body: string }[];
 }) {
   const { t, locale } = useI18n();
   const { installedVersions } = useInstall();
@@ -30,20 +24,12 @@ export function Home({
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [gameError, setGameError] = useState<{ tag: string; exitCode: number } | null>(null);
   const [gameFolderPath, setGameFolderPath] = useState<string | null>(null);
+  const [gameFolderError, setGameFolderError] = useState<unknown>(null);
 
   const sortedVersions = useMemo(
     () => [...installedVersions].sort((a, b) => compareTags(b.tag, a.tag)),
     [installedVersions]
   );
-
-  const latestRelease = useMemo(() => {
-    if (releases.length === 0) return null;
-    return (
-      releases.find((r) => r.tag === latestTag) ??
-      [...releases].sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())[0]
-    );
-  }, [releases, latestTag]);
-  const notesSummary = latestRelease ? summarizeNotes(latestRelease.body) : "";
 
   // Initialize selectedTag from localStorage (lastPlayed) on mount
   useEffect(() => {
@@ -88,6 +74,29 @@ export function Home({
   [sortedVersions, effectiveTag]
 );
 
+  // Ask the backend where the game keeps its data; it checks that the folder exists
+  const loadGameFolderPath = useCallback(async (tag: string | null) => {
+    if (!tag) {
+      setGameFolderPath(null);
+      setGameFolderError(null);
+      return;
+    }
+
+    try {
+      const path = await invoke<string>("get_game_folder_path", { tag });
+      setGameFolderPath(path);
+      setGameFolderError(null);
+    } catch (err) {
+      setGameFolderPath(null);
+      setGameFolderError(err);
+    }
+  }, []);
+
+  // Load game folder path when effectiveTag changes
+  useEffect(() => {
+    loadGameFolderPath(effectiveTag);
+  }, [effectiveTag, loadGameFolderPath]);
+
   const handleLaunch = async (tag: string) => {
     setLaunchError(null);
     setGameError(null);
@@ -101,6 +110,10 @@ export function Home({
       } catch {
         // ignore localStorage errors
       }
+      // After launch, the game will write its folder path to the log
+      setTimeout(() => {
+        loadGameFolderPath(tag);
+      }, 1000);
     }
   };
 
@@ -119,13 +132,15 @@ export function Home({
     try {
       const path = await invoke<string>("open_game_folder", { tag: effectiveTag });
       setGameFolderPath(path);
+      setGameFolderError(null);
     } catch (err) {
       setLaunchError(translateError(err));
+      loadGameFolderPath(effectiveTag);
     }
   };
 
   const isSelectedRunning = effectiveTag ? isRunning(effectiveTag) : false;
-  const playDisabled = anyRunning || isSelectedRunning;
+  const playDisabled = anyRunning;
 
   if (installedVersions.length === 0) {
     return (
@@ -159,6 +174,7 @@ export function Home({
               onClick={() => effectiveTag && handleLaunch(effectiveTag)}
               disabled={!effectiveTag || playDisabled}
               aria-label={isSelectedRunning ? t("playing") : t("playButton")}
+              tabIndex={-1}
             >
               {isSelectedRunning ? t("playing") : t("playButton")}
             </button>
@@ -170,7 +186,16 @@ export function Home({
                 id="version-select"
                 value={effectiveTag || ""}
                 onChange={(e) => setSelectedTag(e.target.value || null)}
+                onMouseDown={(e) => {
+                  // Clicking an already focused selector dismisses it (and its
+                  // highlight) instead of reopening the native dropdown.
+                  if (document.activeElement === e.currentTarget) {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
                 disabled={anyRunning}
+                tabIndex={-1}
               >
                 {sortedVersions.map((v) => (
                   <option key={v.tag} value={v.tag}>
@@ -220,10 +245,17 @@ export function Home({
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">{t("gameFolderTitle")}</span>
-                  <span className="detail-value path">{gameFolderPath || t("gameFolderPath")}</span>
+                  <span className="detail-value path">
+                    {gameFolderPath ??
+                      (gameFolderError ? translateError(gameFolderError) : t("gameFolderPath"))}
+                  </span>
                 </div>
                 <div className="detail-row">
-                  <button className="btn-flat btn-secondary btn-open-folder" onClick={handleOpenFolder}>
+                  <button
+                    className="btn-flat btn-secondary btn-open-folder"
+                    onClick={handleOpenFolder}
+                    disabled={!gameFolderPath}
+                  >
                     {t("openFolderButton")}
                   </button>
                 </div>
@@ -231,23 +263,6 @@ export function Home({
             ) : (
               <p className="select-version-hint">{t("selectVersionHint")}</p>
             )}
-          </div>
-        </section>
-
-        <section className="card notes-summary-card">
-          <div className="card-header">
-            <h2 className="card-title">
-              {t("latestNotesTitle")}{latestRelease ? ` · ${latestRelease.tag}` : ""}
-            </h2>
-          </div>
-          <div className="card-body">
-            {latestRelease && (
-              <div className="notes-summary-date">{formatDate(latestRelease.published_at, locale)}</div>
-            )}
-            <div className="notes-summary-body">{notesSummary || t("noChangelog")}</div>
-            <button className="btn-flat btn-secondary" onClick={onGoToNotes}>
-              {t("viewAllNotes")}
-            </button>
           </div>
         </section>
         <SidebarFooter />

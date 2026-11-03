@@ -33,6 +33,7 @@ pub fn run() {
             install::remove_version,
             launch::launch_version,
             launch::get_running_versions,
+            launch::get_game_folder_path,
             launch::open_game_folder,
             launch::open_log
         ])

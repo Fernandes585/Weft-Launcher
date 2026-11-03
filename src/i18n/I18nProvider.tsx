@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { initI18n, getLocale, setLocale, formatSize as i18nFormatSize, t as translate, Locale } from './index';
 
 interface I18nContextValue {
@@ -33,13 +33,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     setLocaleState(newLocale);
   }, []);
 
-  const value: I18nContextValue = {
-    locale,
-    t,
-    formatSize,
-    changeLocale,
-    ready,
-  };
+  const value = useMemo<I18nContextValue>(
+    () => ({ locale, t, formatSize, changeLocale, ready }),
+    [locale, t, formatSize, changeLocale, ready],
+  );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

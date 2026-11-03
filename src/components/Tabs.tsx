@@ -1,6 +1,9 @@
 import { useI18n } from "../i18n/useI18n";
 import { LanguageMenu } from "./LanguageMenu";
 import { UpdateButton } from "./UpdateButton";
+import homeIcon from "../assets/item1-pixel.png";
+import versionsIcon from "../assets/item2-pixel.png";
+import notesIcon from "../assets/item3-pixel.png";
 
 type TabId = "home" | "versions" | "notes";
 
@@ -13,10 +16,10 @@ interface TabsProps {
 export function Tabs({ activeTab, onChange, hasNewVersions }: TabsProps) {
   const { t } = useI18n();
 
-  const tabs: { id: TabId; label: string; number: string }[] = [
-    { id: "home", label: t("tabHome"), number: "1" },
-    { id: "versions", label: t("tabVersions"), number: "2" },
-    { id: "notes", label: t("tabNotes"), number: "3" },
+  const tabs: { id: TabId; label: string; icon: string }[] = [
+    { id: "home", label: t("tabHome"), icon: homeIcon },
+    { id: "versions", label: t("tabVersions"), icon: versionsIcon },
+    { id: "notes", label: t("tabNotes"), icon: notesIcon },
   ];
 
   return (
@@ -33,7 +36,9 @@ export function Tabs({ activeTab, onChange, hasNewVersions }: TabsProps) {
           aria-label={tab.label}
           title={tab.label}
         >
-          <span className="tab-number">{tab.number}</span>
+          <span className="tab-number">
+            <img src={tab.icon} alt="" />
+          </span>
           {tab.id === "versions" && hasNewVersions && <span className="new-dot" aria-label="New versions available" />}
         </button>
       ))}
