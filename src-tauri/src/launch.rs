@@ -308,11 +308,11 @@ pub async fn open_game_folder(app_handle: AppHandle, tag: String) -> Result<Stri
                 if open_folder_on_linux(&path_str) {
                     return Ok(path_str);
                 }
-                return Err(LaunchError::OpenGameFolderError(format!(
+                Err(LaunchError::OpenGameFolderError(format!(
                     "could not open the game folder (tauri opener: {}; xdg-open, gio and kde-open failed)",
                     opener_err
                 ))
-                .into());
+                .into())
             }
 
             #[cfg(not(target_os = "linux"))]
